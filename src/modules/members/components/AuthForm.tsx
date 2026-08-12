@@ -1,0 +1,374 @@
+'use client';
+
+import React, { useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { 
+  KeyRound, 
+  Mail, 
+  UserPlus, 
+  LogIn, 
+  Phone, 
+  CheckCircle2, 
+  MapPin, 
+  Calendar, 
+  Hash, 
+  CreditCard, 
+  FileCheck 
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+
+export default function AuthForm() {
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [regType, setRegType] = useState<'visitor' | 'member'>('visitor');
+  
+  // Champs de base (Visiteur & Adhérent)
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  
+  // Champs spécifiques Adhérent
+  const [phone, setPhone] = useState('');
+  const [streetNumber, setStreetNumber] = useState('');
+  const [zipCode, setZipCode] = useState('');
+  const [city, setCity] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [membershipChoice, setMembershipChoice] = useState('member');
+  const [transponderNumber, setTransponderNumber] = useState('');
+  const [roiAccepted, setRoiAccepted] = useState(false);
+  
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const supabase = createClient();
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      if (isSignUp) {
+        // Validation dynamique côté client
+        if (regType === 'member') {
+          if (!phone) throw new Error("Le numéro de téléphone est obligatoire.");
+          if (!streetNumber) throw new Error("La rue et le numéro sont obligatoires.");
+          if (!zipCode) throw new Error("Le code postal est obligatoire.");
+          if (!city) throw new Error("La ville est obligatoire.");
+          if (!birthDate) throw new Error("La date de naissance est obligatoire.");
+          if (!roiAccepted) throw new Error("Vous devez accepter le Règlement d'Ordre Intérieur (ROI).");
+        }
+
+        // Préparation des métadonnées utilisateur
+        const metaData: any = {
+          first_name: firstName,
+          last_name: lastName,
+          registration_type: regType,
+        };
+
+        if (regType === 'member') {
+          metaData.phone = phone;
+          metaData.street_number = streetNumber;
+          metaData.zip_code = zipCode;
+          metaData.city = city;
+          metaData.birth_date = birthDate;
+          metaData.membership_choice = membershipChoice;
+          metaData.transponder_number = transponderNumber || null;
+          metaData.roi_accepted = roiAccepted;
+        }
+
+        // Enregistrement Auth Supabase avec métadonnées
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: metaData,
+          },
+        });
+
+        if (authError) throw authError;
+
+        setSuccessMsg("Inscription réussie ! Vous pouvez maintenant vous connecter.");
+        setIsSignUp(false);
+      } else {
+        // Connexion
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (signInError) throw signInError;
+
+        router.push('/dashboard');
+        router.refresh();
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Une erreur est survenue lors de l'authentification.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="w-full max-w-lg mx-auto premium-card p-6 md:p-8 rounded-lg">
+      <div className="text-center mb-6">
+        <h2 className="font-anybody font-black text-2xl uppercase tracking-tight sport-skew text-white">
+          {isSignUp ? 'Créer un compte' : 'Se connecter'}
+        </h2>
+        <p className="text-xs text-foreground/60 mt-1 font-mono">
+          {isSignUp ? 'Rejoignez le Seraing Buggy Club' : 'Accédez à votre espace pilote'}
+        </p>
+      </div>
+
+      {isSignUp && (
+        <div className="flex gap-2 p-1 bg-background/50 border border-[#353535] rounded mb-6">
+          <button
+            type="button"
+            onClick={() => {
+              setRegType('visitor');
+              setErrorMsg('');
+            }}
+            className={`flex-1 py-2 text-xs font-mono font-bold uppercase tracking-wider rounded transition-all cursor-pointer ${
+              regType === 'visitor'
+                ? 'bg-primary text-black shadow-[0_0_10px_rgba(var(--primary-rgb),0.3)]'
+                : 'text-foreground/60 hover:text-white'
+            }`}
+          >
+            Visiteur / One Day
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setRegType('member');
+              setErrorMsg('');
+            }}
+            className={`flex-1 py-2 text-xs font-mono font-bold uppercase tracking-wider rounded transition-all cursor-pointer ${
+              regType === 'member'
+                ? 'bg-primary text-black shadow-[0_0_10px_rgba(var(--primary-rgb),0.3)]'
+                : 'text-foreground/60 hover:text-white'
+            }`}
+          >
+            Adhérent SBC
+          </button>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="p-3.5 mb-5 rounded bg-secondary/10 border border-secondary/20 text-secondary text-xs font-mono">
+          ⚠️ {errorMsg}
+        </div>
+      )}
+
+      {successMsg && (
+        <div className="p-3.5 mb-5 rounded bg-success/10 border border-success/20 text-success text-xs font-mono flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          {successMsg}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {isSignUp && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">Prénom</label>
+              <input
+                type="text"
+                required
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-sans"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">Nom</label>
+              <input
+                type="text"
+                required
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-sans"
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">Adresse Email</label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35" />
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-background border border-[#353535] rounded pl-10 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-sans"
+                placeholder="pilote@gmail.com"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">Mot de passe</label>
+            <div className="relative">
+              <KeyRound className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35" />
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-background border border-[#353535] rounded pl-10 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-sans"
+              />
+            </div>
+          </div>
+        </div>
+
+        {isSignUp && regType === 'member' && (
+          <div className="space-y-4 pt-2 border-t border-[#353535]/30">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">Téléphone</label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35" />
+                  <input
+                    type="text"
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full bg-background border border-[#353535] rounded pl-10 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-mono"
+                    placeholder="+32 470 00 00 00"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">Date de naissance</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35" />
+                  <input
+                    type="date"
+                    required
+                    value={birthDate}
+                    onChange={(e) => setBirthDate(e.target.value)}
+                    className="w-full bg-background border border-[#353535] rounded pl-10 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">Rue et numéro</label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35" />
+                <input
+                  type="text"
+                  required
+                  value={streetNumber}
+                  onChange={(e) => setStreetNumber(e.target.value)}
+                  className="w-full bg-background border border-[#353535] rounded pl-10 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-sans"
+                  placeholder="Rue du Circuit, 42"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">Code postal</label>
+                <input
+                  type="text"
+                  required
+                  value={zipCode}
+                  onChange={(e) => setZipCode(e.target.value)}
+                  className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-mono"
+                  placeholder="4100"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">Ville</label>
+                <input
+                  type="text"
+                  required
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-sans"
+                  placeholder="Seraing"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">Cotisation</label>
+                <div className="relative">
+                  <CreditCard className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35" />
+                  <select
+                    value={membershipChoice}
+                    onChange={(e) => setMembershipChoice(e.target.value)}
+                    className="w-full bg-background border border-[#353535] rounded pl-10 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-sans appearance-none cursor-pointer"
+                  >
+                    <option value="member">Annuelle (130 €)</option>
+                    <option value="daily_member">1 Jour (20 €)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">N° Transpondeur (Facultatif)</label>
+                <div className="relative">
+                  <Hash className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35" />
+                  <input
+                    type="text"
+                    value={transponderNumber}
+                    onChange={(e) => setTransponderNumber(e.target.value)}
+                    className="w-full bg-background border border-[#353535] rounded pl-10 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-mono"
+                    placeholder="1234567"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2.5 pt-2">
+              <input
+                id="roi"
+                type="checkbox"
+                required
+                checked={roiAccepted}
+                onChange={(e) => setRoiAccepted(e.target.checked)}
+                className="mt-1 w-4 h-4 bg-background border border-[#353535] rounded checked:bg-primary accent-primary text-black cursor-pointer"
+              />
+              <label htmlFor="roi" className="text-xs text-foreground/75 leading-tight font-sans select-none">
+                J'accepte le <span className="text-primary hover:text-white underline cursor-pointer">Règlement d'Ordre Intérieur (ROI)</span> du club.
+              </label>
+            </div>
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full premium-btn text-sm flex items-center justify-center gap-2 mt-5 cursor-pointer disabled:opacity-50"
+        >
+          <span className="transform skew-x-8 flex items-center gap-2">
+            {isSignUp ? <UserPlus className="w-4 h-4" /> : <LogIn className="w-4 h-4" />}
+            {loading ? 'Chargement...' : isSignUp ? "S'inscrire" : 'Se connecter'}
+          </span>
+        </button>
+      </form>
+
+      <div className="mt-6 pt-4 border-t border-[#353535]/50 text-center">
+        <button
+          onClick={() => {
+            setIsSignUp(!isSignUp);
+            setErrorMsg('');
+          }}
+          className="text-xs text-primary hover:text-secondary hover:underline transition-colors font-mono cursor-pointer"
+        >
+          {isSignUp ? "Vous avez déjà un compte ? Se connecter" : "Nouveau pilote ? Créer un compte"}
+        </button>
+      </div>
+    </div>
+  );
+}

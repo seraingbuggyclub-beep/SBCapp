@@ -1,0 +1,103 @@
+@import url('https://fonts.googleapis.com/css2?family=Anybody:ital,wght@0,100..900;1,100..900&family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+@import "tailwindcss";
+
+
+@theme {
+  --color-primary: #ff6e00;       /* Dirt Orange */
+  --color-secondary: #e62117;     /* Racing Red */
+  --color-tertiary: #2e5bff;      /* Electric Blue */
+  --color-success: #76b148;       /* Grass Green */
+  --color-background: #131313;    /* Main dark background */
+  --color-foreground: #e5e2e1;    /* Main light text */
+  --color-surface: #20201f;       /* Dark card background */
+  --color-surface-high: #2a2a2a;  /* Hover card background */
+  --color-surface-dim: #0e0e0e;   /* Deep black panels */
+  
+  --font-sans: "Hanken Grotesk", sans-serif;
+  --font-anybody: "Anybody", sans-serif;
+  --font-hanken: "Hanken Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+:root {
+  --background: #131313;
+  --foreground: #e5e2e1;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: hidden;
+}
+
+/* Custom premium scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #131313;
+}
+::-webkit-scrollbar-thumb {
+  background: #ff6e00;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #e62117;
+}
+
+/* Skew utility for sports headings */
+.sport-skew {
+  transform: skewX(-8deg);
+}
+
+/* Interactive hard shadow card styling */
+.premium-card {
+  background-color: #20201f;
+  border: 1px solid #353535;
+  box-shadow: 4px 4px 0px #000000;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.premium-card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0px #000000;
+  border-color: #ff6e00;
+}
+
+.premium-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ff6e00;
+  color: #000000;
+  font-family: var(--font-anybody);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  padding: 0.75rem 1.5rem;
+  border: 1px solid #000000;
+  box-shadow: 4px 4px 0px #000000;
+  transform: skewX(-8deg);
+  transition: all 0.15s ease-in-out;
+  cursor: pointer;
+}
+
+.premium-btn > * {
+  transform: skewX(8deg);
+}
+
+.premium-btn:hover {
+  background-color: #e62117;
+  color: #ffffff;
+  transform: skewX(-8deg) translate(-2px, -2px);
+  box-shadow: 6px 6px 0px #000000;
+}
+
+.premium-btn:active {
+  transform: skewX(-8deg) translate(0px, 0px);
+  box-shadow: 0px 0px 0px #000000;
+}

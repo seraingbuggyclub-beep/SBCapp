@@ -6,6 +6,10 @@ import { updateMemberProfile } from '@/modules/members/actions';
 import { getMemberRegistrations, getActiveEvents } from '@/modules/events/actions';
 import { getMemberClubLockCode } from '@/modules/payments/actions';
 import AuthForm from '@/modules/members/components/AuthForm';
+import MemberQrCodeCard from '@/modules/members/components/MemberQrCodeCard';
+import PilotAttendanceWidget from '@/modules/attendance/components/PilotAttendanceWidget';
+import MemberPrivacyCenter from '@/modules/gdpr/components/MemberPrivacyCenter';
+import MembershipPaymentModal from '@/modules/payments/components/MembershipPaymentModal';
 import {
   User,
   CheckCircle2,
@@ -72,6 +76,7 @@ export default function DashboardPage() {
 
   // Modale de lecture des documents officiels (ROI / Charte)
   const [activeDocModal, setActiveDocModal] = useState<'roi' | 'charte' | null>(null);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
   const isMountedRef = useRef(true);
 
@@ -248,6 +253,29 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Bannière de relance de cotisation si non acquittée */}
+      {!isPaid && (
+        <div className="p-4 md:p-5 rounded-xl border-2 border-yellow-500/40 bg-yellow-500/10 text-white font-mono text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[0_0_30px_rgba(234,179,8,0.15)] animate-fade-in">
+          <div className="flex items-start sm:items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5 sm:mt-0" />
+            <div>
+              <strong className="text-yellow-400 font-bold block text-sm font-sans uppercase">
+                Cotisation Annuelle en Attente
+              </strong>
+              <span className="text-foreground/85 text-xs">
+                Réglez votre cotisation pour déverrouiller le code cadenas du portail, activer votre assurance FBA et obtenir votre Pass Pilote actif (QR Code Blanc).
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => setPaymentModalOpen(true)}
+            className="px-4 py-2.5 rounded-lg bg-primary text-black font-anybody font-black uppercase text-xs tracking-wider border border-black hover:bg-secondary hover:text-white transition-all sport-skew shadow-[3px_3px_0px_#000] cursor-pointer shrink-0 self-start sm:self-center"
+          >
+            <span className="transform skew-x-8">Régler ma cotisation</span>
+          </button>
+        </div>
+      )}
+
       {/* 1. Header Cockpit Pilote avec Boutons d'Action Rapide */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-[#353535] pb-6">
         <div>
@@ -306,6 +334,16 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Pass Pilote Officiel avec QR Code Dynamique */}
+      <section className="w-full">
+        <MemberQrCodeCard member={profile} />
+      </section>
+
+      {/* Pointage Officiel FBA en direct */}
+      <section className="w-full">
+        <PilotAttendanceWidget member={profile} />
+      </section>
+
       {/* 2. Grille des Widgets Clés (Cadenas, Assurance FBA, Setups Teaser) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Widget Cadenas d'accès (Compact & Direct) */}
@@ -339,9 +377,17 @@ export default function DashboardPage() {
                 </div>
               </div>
             ) : (
-              <p className="text-xs font-mono text-foreground/60 leading-relaxed">
-                Le code d'accès au portail et aux stands est réservé aux membres en ordre de cotisation.
-              </p>
+              <div className="space-y-2">
+                <p className="text-xs font-mono text-foreground/60 leading-relaxed">
+                  Le code d'accès au portail et aux stands est réservé aux membres en ordre de cotisation.
+                </p>
+                <button
+                  onClick={() => setPaymentModalOpen(true)}
+                  className="w-full py-2 rounded bg-primary/20 hover:bg-primary/30 border border-primary/40 text-primary font-anybody font-bold text-xs uppercase tracking-wider transition-all cursor-pointer sport-skew flex items-center justify-center gap-1.5"
+                >
+                  <span className="transform skew-x-8">Régler ma cotisation</span>
+                </button>
+              </div>
             )}
           </div>
 
@@ -811,7 +857,12 @@ export default function DashboardPage() {
         </form>
       </div>
 
-      {/* 5. Modale de Lecture des Documents Officiels (ROI & Charte) */}
+      {/* 5. Centre de Confidentialité & Préférences RGPD (Conformité APD) */}
+      <section id="privacy-section" className="w-full">
+        <MemberPrivacyCenter member={profile} onUpdate={refreshAuth} />
+      </section>
+
+      {/* 6. Modale de Lecture des Documents Officiels (ROI & Charte) */}
       {activeDocModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto premium-card p-6 md:p-8 rounded-lg border border-[#353535] relative shadow-2xl space-y-5">
@@ -869,6 +920,14 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Modale de Paiement de Cotisation */}
+      <MembershipPaymentModal
+        member={profile}
+        isOpen={paymentModalOpen}
+        onClose={() => setPaymentModalOpen(false)}
+        onPaymentUpdated={refreshAuth}
+      />
     </div>
   );
 }

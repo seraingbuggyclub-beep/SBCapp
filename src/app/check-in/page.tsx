@@ -8,6 +8,7 @@ import CadenasLock from '@/modules/payments/components/CadenasLock';
 import FbaDisclaimer from '@/modules/presence/components/FbaDisclaimer';
 import { KeyRound } from 'lucide-react';
 import Link from 'next/link';
+import PilotAttendanceWidget from '@/modules/attendance/components/PilotAttendanceWidget';
 import { PresenceSession } from '@/types/models';
 
 export default function CheckInPage() {
@@ -149,6 +150,9 @@ export default function CheckInPage() {
           Radar FBA Actif
         </div>
       </div>
+
+      {/* Pointage Officiel FBA par piste */}
+      <PilotAttendanceWidget member={profile} />
 
       {/* Mandatory disclaimer */}
       <FbaDisclaimer />

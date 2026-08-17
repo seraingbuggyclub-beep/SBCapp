@@ -16,9 +16,14 @@ import {
   AlertTriangle,
   XCircle,
   Shield,
+  QrCode,
+  Maximize2,
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { MemberProfile, UserRole, ModulePermissionsMap } from '@/types/models';
 import { PermissionsMatrix } from './PermissionsMatrix';
+import { getMemberQrPayload, getMemberQrTheme } from '@/modules/members/utils/qrcode';
+import QrCodeModal from '@/modules/members/components/QrCodeModal';
 
 interface MembersManagementTabProps {
   members: MemberProfile[];
@@ -46,6 +51,7 @@ export default function MembersManagementTab({
   onToggleExpandedMember,
 }: MembersManagementTabProps) {
   const [selectedMember, setSelectedMember] = useState<MemberProfile | null>(null);
+  const [qrModalMember, setQrModalMember] = useState<MemberProfile | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
 
@@ -254,16 +260,31 @@ export default function MembersManagementTab({
                       </div>
                     </td>
 
-                    {/* Action Fiche Pilote */}
+                    {/* Actions : QR Code & Fiche Pilote */}
                     <td className="px-5 py-3.5 text-right">
-                      <button
-                        onClick={() => setSelectedMember(member)}
-                        className="p-1.5 rounded bg-surface hover:bg-surface-high border border-[#353535] text-foreground/60 hover:text-white hover:border-primary cursor-pointer transition-colors inline-flex items-center gap-1 text-[10px]"
-                        title="Consulter la fiche complète"
-                      >
-                        <Eye className="w-3.5 h-3.5 text-primary" />
-                        <span className="hidden md:inline">Voir</span>
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => setQrModalMember(member)}
+                          className={`p-1.5 rounded border transition-all cursor-pointer inline-flex items-center gap-1 text-[10px] ${
+                            member.payment_status === 'paid'
+                              ? 'bg-green-500/10 border-green-500/30 text-green-400 hover:bg-green-500/20'
+                              : 'bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20'
+                          }`}
+                          title={`Pass QR Code (${member.payment_status === 'paid' ? 'En ordre' : 'Cotisation non réglée'})`}
+                        >
+                          <QrCode className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline font-mono">QR</span>
+                        </button>
+
+                        <button
+                          onClick={() => setSelectedMember(member)}
+                          className="p-1.5 rounded bg-surface hover:bg-surface-high border border-[#353535] text-foreground/60 hover:text-white hover:border-primary cursor-pointer transition-colors inline-flex items-center gap-1 text-[10px]"
+                          title="Consulter la fiche complète"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-primary" />
+                          <span className="hidden md:inline">Voir</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
 
@@ -288,10 +309,10 @@ export default function MembersManagementTab({
         </table>
       </div>
 
-      {/* Modale Détails Pilote */}
+      {/* Modale Détails Pilote avec QR Code */}
       {selectedMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md premium-card p-6 md:p-8 rounded-lg border border-[#353535] relative shadow-[0_0_50px_rgba(0,0,0,0.8)]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md premium-card p-6 md:p-7 rounded-2xl border border-[#353535] relative shadow-[0_0_50px_rgba(0,0,0,0.8)] max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setSelectedMember(null)}
               className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-surface border border-transparent hover:border-[#353535] text-foreground/50 hover:text-white transition-all cursor-pointer"
@@ -300,14 +321,57 @@ export default function MembersManagementTab({
               <X className="w-4 h-4" />
             </button>
 
-            <div className="mb-5 pb-3 border-b border-[#353535]/50">
+            <div className="mb-4 pb-3 border-b border-[#353535]/50">
               <h3 className="font-anybody font-black text-xl uppercase tracking-tight sport-skew text-white">
                 Fiche Pilote
               </h3>
-              <p className="text-[10px] text-primary font-mono mt-1 uppercase tracking-wider">
+              <p className="text-[10px] text-primary font-mono mt-0.5 uppercase tracking-wider">
                 Seraing Buggy Club
               </p>
             </div>
+
+            {/* QR Code Card inside details modal */}
+            {(() => {
+              const theme = getMemberQrTheme(selectedMember.payment_status);
+              const payload = getMemberQrPayload(selectedMember.id);
+
+              return (
+                <div className={`p-4 rounded-xl border bg-black/60 mb-4 flex items-center justify-between gap-4 ${theme.containerBorder} ${theme.glowClass}`}>
+                  <div className="p-2 rounded-lg bg-black border border-[#353535] shrink-0">
+                    <QRCodeSVG
+                      value={payload}
+                      size={72}
+                      level="M"
+                      fgColor={theme.fgColor}
+                      bgColor="transparent"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 flex-1 min-w-0">
+                    <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border ${theme.badgeClass}`}>
+                      {theme.isPaid ? <CheckCircle2 className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+                      <span>{theme.statusLabel}</span>
+                    </div>
+
+                    <p className="text-[10px] font-mono text-foreground/50 truncate">
+                      ID: {selectedMember.id.substring(0, 16)}...
+                    </p>
+
+                    <button
+                      onClick={() => {
+                        const m = selectedMember;
+                        setSelectedMember(null);
+                        setQrModalMember(m);
+                      }}
+                      className="px-2.5 py-1 rounded bg-surface hover:bg-surface-high border border-[#353535] hover:border-primary text-[10px] font-mono text-foreground/80 hover:text-white flex items-center gap-1 transition-all cursor-pointer"
+                    >
+                      <Maximize2 className="w-3 h-3 text-primary" />
+                      <span>Agrandir (Mode Soleil)</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="space-y-4 font-mono text-xs text-foreground/80">
               <div>
@@ -365,6 +429,13 @@ export default function MembersManagementTab({
           </div>
         </div>
       )}
+
+      {/* Modale Plein Écran QR Code */}
+      <QrCodeModal
+        member={qrModalMember}
+        isOpen={Boolean(qrModalMember)}
+        onClose={() => setQrModalMember(null)}
+      />
     </div>
   );
 }

@@ -3,12 +3,14 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
-import { LogOut, User, Key, Menu, X, Shield, Radio, Trophy, LayoutDashboard } from 'lucide-react';
+import { LogOut, User, Key, Menu, X, Shield, Radio, Trophy, LayoutDashboard, QrCode } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
+import QrCodeModal from '@/modules/members/components/QrCodeModal';
 
 export default function AppHeader() {
   const { user, profile, isAdmin, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [headerQrOpen, setHeaderQrOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -27,6 +29,7 @@ export default function AppHeader() {
     { href: '/', label: 'Accueil' },
     { href: '/events', label: 'Courses & Calendrier' },
     { href: '/check-in', label: 'Check-in Piste' },
+    { href: '/buvette/self-service', label: 'Buvette' },
     { href: '/dashboard', label: 'Espace Pilote' },
     { href: '/pit-lane', label: 'Pit-Lane' },
   ];
@@ -78,7 +81,23 @@ export default function AppHeader() {
         {/* Auth / Profile Actions Right */}
         <div className="flex items-center gap-3">
           {user ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Quick Pass QR Button */}
+              {profile && (
+                <button
+                  onClick={() => setHeaderQrOpen(true)}
+                  className={`px-2.5 py-1.5 rounded-lg border text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer ${
+                    profile.payment_status === 'paid'
+                      ? 'bg-green-500/10 border-green-500/30 text-green-400 hover:bg-green-500/20 shadow-[0_0_10px_rgba(34,197,94,0.15)]'
+                      : 'bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20'
+                  }`}
+                  title="Afficher mon Pass Pilote QR"
+                >
+                  <QrCode className="w-3.5 h-3.5" />
+                  <span className="hidden lg:inline text-[10px] font-bold uppercase tracking-wider">Pass QR</span>
+                </button>
+              )}
+
               {/* Statut Cotisation Badge */}
               {profile && (
                 <span
@@ -166,8 +185,20 @@ export default function AppHeader() {
           <div className="pt-4 border-t border-[#353535] flex items-center justify-between">
             {user ? (
               <div className="flex items-center justify-between w-full">
-                <div className="text-xs font-mono text-foreground/60">
-                  Connecté : <strong className="text-white">{profile?.first_name || user.email}</strong>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setIsOpen(false);
+                      setHeaderQrOpen(true);
+                    }}
+                    className="p-1.5 rounded bg-primary/20 border border-primary/40 text-primary text-xs font-mono flex items-center gap-1 cursor-pointer"
+                  >
+                    <QrCode className="w-3.5 h-3.5" />
+                    <span>Pass QR</span>
+                  </button>
+                  <span className="text-xs font-mono text-foreground/60">
+                    <strong className="text-white">{profile?.first_name || user.email}</strong>
+                  </span>
                 </div>
                 <button
                   onClick={handleSignOut}
@@ -188,6 +219,13 @@ export default function AppHeader() {
           </div>
         </div>
       )}
+
+      {/* Header QR Modal */}
+      <QrCodeModal
+        member={profile}
+        isOpen={headerQrOpen}
+        onClose={() => setHeaderQrOpen(false)}
+      />
     </div>
   );
 }

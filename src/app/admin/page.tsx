@@ -9,7 +9,7 @@ import {
   updateMemberRoleAndPermissions,
 } from '@/modules/admin/actions';
 import { createClient } from '@/lib/supabase/client';
-import { Shield, Users, Lock, Key, Ghost, ShieldAlert, RefreshCw, Radio } from 'lucide-react';
+import { Shield, Users, Lock, Key, Ghost, ShieldAlert, RefreshCw, Radio, Flag, Coins } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { usePermissions } from '@/modules/admin/hooks/usePermissions';
 import { useSimulation } from '@/modules/admin/contexts/SimulationContext';
@@ -21,8 +21,10 @@ import MembersManagementTab from '@/modules/admin/components/MembersManagementTa
 import PermissionsTab from '@/modules/admin/components/PermissionsTab';
 import AccessCodeTab from '@/modules/admin/components/AccessCodeTab';
 import CommunicationsTab from '@/modules/admin/components/CommunicationsTab';
+import AdminTracksTab from '@/modules/tracks/components/AdminTracksTab';
+import TreasuryTab from '@/modules/admin/components/TreasuryTab';
 
-type AdminTab = 'members' | 'communications' | 'permissions' | 'cadenas';
+type AdminTab = 'members' | 'treasury' | 'tracks' | 'communications' | 'permissions' | 'cadenas';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -282,6 +284,30 @@ export default function AdminPage() {
         </button>
 
         <button
+          onClick={() => setActiveTab('treasury')}
+          className={`px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
+            activeTab === 'treasury'
+              ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
+              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white'
+          }`}
+        >
+          <Coins className="w-4 h-4" />
+          <span className="transform skew-x-8">Trésorerie & Cotisations</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('tracks')}
+          className={`px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
+            activeTab === 'tracks'
+              ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
+              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white'
+          }`}
+        >
+          <Flag className="w-4 h-4" />
+          <span className="transform skew-x-8">Pistes</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('communications')}
           className={`px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
             activeTab === 'communications'
@@ -340,6 +366,20 @@ export default function AdminPage() {
           onUpdateStatus={handleUpdateStatus}
           onSavePermissions={handleSavePermissions}
           onToggleExpandedMember={setExpandedMemberId}
+        />
+      )}
+
+      {activeTab === 'treasury' && (
+        <TreasuryTab
+          canEdit={permissions.isAdmin || permissions.isSuperAdmin}
+          isSimulated={Boolean(simulatedProfile)}
+        />
+      )}
+
+      {activeTab === 'tracks' && (
+        <AdminTracksTab
+          canEdit={permissions.isAdmin || permissions.isSuperAdmin}
+          isSimulated={Boolean(simulatedProfile)}
         />
       )}
 

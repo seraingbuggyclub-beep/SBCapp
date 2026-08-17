@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Users, Trophy, Shield } from 'lucide-react';
+import { Users, Trophy, Shield, Coffee, Scale, ShieldCheck, Lock } from 'lucide-react';
 
 export default function AdminNav() {
   const pathname = usePathname();
@@ -14,6 +14,30 @@ export default function AdminNav() {
       label: 'Membres & Cadenas',
       icon: Users,
       active: pathname === '/admin',
+    },
+    {
+      href: '/admin/presences',
+      label: 'Présences FBA',
+      icon: ShieldCheck,
+      active: pathname.startsWith('/admin/presences'),
+    },
+    {
+      href: '/admin/comptabilite',
+      label: 'Comptabilité ASBL',
+      icon: Scale,
+      active: pathname.startsWith('/admin/comptabilite'),
+    },
+    {
+      href: '/admin/buvette',
+      label: 'Buvette & POS',
+      icon: Coffee,
+      active: pathname.startsWith('/admin/buvette'),
+    },
+    {
+      href: '/admin/rgpd',
+      label: 'RGPD & APD',
+      icon: Lock,
+      active: pathname.startsWith('/admin/rgpd'),
     },
     {
       href: '/admin/events',

@@ -7,6 +7,8 @@ import { Trophy, Shield, MapPin, Key, Radio, Navigation, UserCheck, LockOpen } f
 import { createClient } from '@/lib/supabase/server';
 import LockCodeWidget from '@/modules/admin/components/LockCodeWidget';
 import EventsCalendarView from '@/modules/events/components/EventsCalendarView';
+import TracksLiveStatus from '@/modules/tracks/components/TracksLiveStatus';
+import MemberQrCodeCard from '@/modules/members/components/MemberQrCodeCard';
 
 export const revalidate = 0; // Force SSR
 
@@ -106,8 +108,20 @@ export default async function LandingPage() {
       </section>
 
       {/* Main content in a centered container */}
-      <div className="w-full max-w-6xl mx-auto px-6 py-12 space-y-8 relative z-10">
+      <div className="w-full max-w-6xl mx-auto px-6 py-10 space-y-8 relative z-10">
         
+        {/* Pass Pilote si l'utilisateur est connecté */}
+        {profile && (
+          <section className="max-w-xl mx-auto w-full">
+            <MemberQrCodeCard member={profile} />
+          </section>
+        )}
+
+        {/* Live Track Status & Weather */}
+        <section>
+          <TracksLiveStatus />
+        </section>
+
         {/* FBA Insurance Warning */}
         <section>
           <FbaDisclaimer />

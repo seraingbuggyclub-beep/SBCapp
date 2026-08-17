@@ -4,10 +4,11 @@ import React from 'react';
 import { LockOpen } from 'lucide-react';
 import { useSimulation } from '../contexts/SimulationContext';
 import { usePermissions } from '../hooks/usePermissions';
+import { MemberProfile } from '@/types/models';
 
 interface LockCodeWidgetProps {
   initialLockCode: string | null;
-  realUserProfile: any;
+  realUserProfile: MemberProfile | null;
 }
 
 export default function LockCodeWidget({ initialLockCode, realUserProfile }: LockCodeWidgetProps) {

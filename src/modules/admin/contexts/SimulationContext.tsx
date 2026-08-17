@@ -3,17 +3,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Ghost, ArrowLeftRight } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
+import { MemberProfile } from '@/types/models';
 
 interface SimulationContextType {
-  simulatedProfile: any;
-  setSimulatedProfile: (profile: any) => void;
+  simulatedProfile: MemberProfile | null;
+  setSimulatedProfile: (profile: MemberProfile | null) => void;
   isSimulationActive: boolean;
 }
 
 const SimulationContext = createContext<SimulationContextType | undefined>(undefined);
 
 export function SimulationProvider({ children }: { children: React.ReactNode }) {
-  const [simulatedProfile, setSimulatedProfileState] = useState<any>(null);
+  const [simulatedProfile, setSimulatedProfileState] = useState<MemberProfile | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -31,7 +32,7 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
     }
   }, []);
 
-  const setSimulatedProfile = (profile: any) => {
+  const setSimulatedProfile = (profile: MemberProfile | null) => {
     if (profile) {
       sessionStorage.setItem('sbc_simulated_profile', JSON.stringify(profile));
     } else {
@@ -59,38 +60,27 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF6B00] opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#FF6B00]"></span>
             </span>
-            <div className="text-[10px] sm:text-xs font-mono tracking-wider text-white uppercase flex items-center gap-1.5 flex-wrap">
-              <span className="text-primary font-black flex items-center gap-1">
-                <Ghost className="w-3.5 h-3.5 animate-pulse" />
-                [MODE MASQUERADE ACTIVE]
-              </span>
-              <span className="text-[#404040] hidden sm:inline">|</span>
-              <span>Simulation : <strong className="text-white">{simulatedProfile.first_name} {simulatedProfile.last_name}</strong></span> 
-              <span className="text-[#404040]">|</span>
-              <span>Rôle : <strong className="text-primary">{getRoleLabel(simulatedProfile.role)}</strong></span>
-              <span className="text-[#404040] hidden md:inline">|</span>
-              <span className="text-foreground/50 hidden md:inline">{simulatedProfile.email}</span>
-            </div>
+            <Ghost className="w-4 h-4 text-[#FF6B00]" />
+            <span className="text-xs font-mono tracking-wider uppercase text-white font-bold">
+              Simulation Active : <span className="text-[#FF6B00]">{simulatedProfile.first_name} {simulatedProfile.last_name}</span> ({getRoleLabel(simulatedProfile.role || 'visitor')})
+            </span>
           </div>
-          
-          <div className="flex items-center gap-2.5">
+
+          <div className="flex items-center gap-4">
             {pathname !== '/admin' && (
               <button
                 onClick={() => router.push('/admin')}
-                className="px-2.5 py-1 rounded border border-[#353535] hover:border-primary text-foreground/75 hover:text-white text-[9px] font-bold font-mono uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+                className="text-[11px] font-mono text-[#A0A0A0] hover:text-white transition-colors underline flex items-center gap-1"
               >
-                <ArrowLeftRight className="w-3 h-3 text-primary" />
-                Admin
+                Retour Admin
               </button>
             )}
             <button
-              onClick={() => {
-                setSimulatedProfile(null);
-                router.refresh();
-              }}
-              className="px-3 py-1 rounded bg-primary hover:bg-[#e05e00] text-black text-[9px] font-bold font-mono uppercase tracking-wider transition-all cursor-pointer shadow-[2px_2px_0px_#000]"
+              onClick={() => setSimulatedProfile(null)}
+              className="flex items-center gap-1.5 px-3 py-1 bg-[#FF6B00]/20 hover:bg-[#FF6B00]/30 border border-[#FF6B00]/40 rounded text-xs font-bold text-[#FF6B00] transition-colors"
             >
-              Quitter
+              <ArrowLeftRight className="w-3.5 h-3.5" />
+              Quitter la simulation
             </button>
           </div>
         </div>
@@ -102,8 +92,8 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
 
 export function useSimulation() {
   const context = useContext(SimulationContext);
-  if (context === undefined) {
-    throw new Error('useSimulation doit être utilisé au sein d\'un SimulationProvider');
+  if (!context) {
+    throw new Error('useSimulation must be used within a SimulationProvider');
   }
   return context;
 }

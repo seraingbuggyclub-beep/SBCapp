@@ -2,15 +2,16 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { PresenceSession, PublicPresenceItem, CheckInType } from '@/types/models';
 
 // Enregistrer la présence (check-in)
 export async function checkInMember(presence: {
   member_id: string;
-  check_in_type: 'manual' | 'auto';
+  check_in_type: CheckInType;
   latitude?: number;
   longitude?: number;
   is_public: boolean;
-}) {
+}): Promise<{ data: PresenceSession | null; error: string | null }> {
   const supabase = await createClient();
 
   // 1. Désactiver toute présence active précédente pour ce membre (sécurité)
@@ -42,11 +43,11 @@ export async function checkInMember(presence: {
   revalidatePath('/');
   revalidatePath('/dashboard');
   revalidatePath('/check-in');
-  return { data, error: null };
+  return { data: (data as PresenceSession) || null, error: null };
 }
 
 // Check-out de présence
-export async function checkOutMember(presenceId: string) {
+export async function checkOutMember(presenceId: string): Promise<{ data: PresenceSession | null; error: string | null }> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('sbc_presence')
@@ -65,11 +66,11 @@ export async function checkOutMember(presenceId: string) {
   revalidatePath('/');
   revalidatePath('/dashboard');
   revalidatePath('/check-in');
-  return { data, error: null };
+  return { data: (data as PresenceSession) || null, error: null };
 }
 
 // Récupérer toutes les présences actives publiques (pour la Landing page)
-export async function getPublicActivePresences() {
+export async function getPublicActivePresences(): Promise<{ data: PublicPresenceItem[]; error: string | null }> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('sbc_presence')
@@ -90,11 +91,11 @@ export async function getPublicActivePresences() {
   if (error) {
     return { data: [], error: error.message };
   }
-  return { data, error: null };
+  return { data: (data as unknown as PublicPresenceItem[]) || [], error: null };
 }
 
 // Récupérer la présence active d'un membre spécifique
-export async function getMemberActivePresence(memberId: string) {
+export async function getMemberActivePresence(memberId: string): Promise<{ data: PresenceSession | null; error: string | null }> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('sbc_presence')
@@ -106,5 +107,5 @@ export async function getMemberActivePresence(memberId: string) {
   if (error) {
     return { data: null, error: error.message };
   }
-  return { data, error: null };
+  return { data: (data as PresenceSession) || null, error: null };
 }

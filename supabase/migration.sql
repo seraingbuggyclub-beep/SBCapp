@@ -303,12 +303,62 @@ VALUES (
     25.00
 ) ON CONFLICT DO NOTHING;
 
--- Seed pour le Super Admin (Stéphane)
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- =========================================================================
+-- 6. TABLES POUR LE BABILLARD PIT-LANE (COMMUNICATIONS DU COMITÉ)
+-- =========================================================================
 
-DO $$
-DECLARE
-    new_user_id uuid := gen_random_uuid();
-END;
-$$;
--- (Suite du seed gérée par le script de migration principal s'il est exécuté)
+CREATE TABLE IF NOT EXISTS sbc_announcements (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    title text NOT NULL,
+    content text NOT NULL,
+    category text NOT NULL DEFAULT 'info_piste' CHECK (category IN ('info_piste', 'travaux', 'briefing_course', 'vie_du_club')),
+    is_pinned boolean NOT NULL DEFAULT false,
+    author_name text NOT NULL DEFAULT 'Comité SBC',
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE sbc_announcements ENABLE ROW LEVEL SECURITY;
+
+-- Lecture publique de tous les messages du babillard
+DROP POLICY IF EXISTS "Lecture publique des annonces" ON sbc_announcements;
+CREATE POLICY "Lecture publique des annonces" ON sbc_announcements
+    FOR SELECT USING (true);
+
+-- Gestion réservée aux administrateurs
+DROP POLICY IF EXISTS "Les admins peuvent gerer les annonces" ON sbc_announcements;
+CREATE POLICY "Les admins peuvent gerer les annonces" ON sbc_announcements
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM sbc_members 
+            WHERE sbc_members.id = auth.uid() 
+              AND (sbc_members.role = 'admin' OR sbc_members.email = 'stefga1@gmail.com')
+        )
+    );
+
+-- Insertion d'annonces initiales de démonstration
+INSERT INTO sbc_announcements (title, content, category, is_pinned, author_name)
+VALUES 
+    (
+        'Ouverture officielle de la saison & État de la piste',
+        'La piste tout-terrain est entièrement opérationnelle pour les entraînements libres. Le système de chronométrage MyLaps est sous tension lors des sessions de présence. Merci de respecter les zones de stands et le sens de circulation.',
+        'info_piste',
+        true,
+        'Comité de Direction SBC'
+    ),
+    (
+        'Travaux de surfaçage & Nouveau virage relevé',
+        'Une session bénévole de compactage et d''amélioration du drainage aura lieu ce samedi matin à 09h00. Les pilotes souhaitant donner un coup de main sont les bienvenus (café et croissants offerts par le club !).',
+        'travaux',
+        false,
+        'Commission Piste'
+    ),
+    (
+        'Briefing Pilotes : Règlement FBA & Sécurité Cadenas',
+        'Rappel à tous les membres : n''oubliez pas d''effectuer votre check-in sur l''application dès votre arrivée pour activer votre couverture d''assurance FBA. Pensez également à toujours reverrouiller le cadenas à combinaison en quittant le terrain.',
+        'vie_du_club',
+        false,
+        'Secrétariat ASBL'
+    )
+ON CONFLICT DO NOTHING;
+

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   getAllEventsAdmin,
@@ -40,6 +40,10 @@ import {
   Check,
 } from 'lucide-react';
 
+import { useAuth } from '@/hooks/useAuth';
+import { ClubEvent, SelectedCategoryItem, SelectedMealItem } from '@/types/models';
+import CategoryMealFields from '@/modules/events/components/CategoryMealFields';
+
 const DEFAULT_CATEGORIES: RaceCategoryItem[] = [
   { name: 'Buggy 1/10 2WD', fee: 10, type: 'Electric' },
   { name: 'Buggy 1/10 4WD', fee: 10, type: 'Electric' },
@@ -56,14 +60,36 @@ const DEFAULT_MEALS: MealOptionItem[] = [
   { name: 'Pain garni Saucisse géante', price: 4.5, desc: 'Pain garni avec saucisse géante' },
 ];
 
+interface EventWithRegCount extends ClubEvent {
+  registrations_count: number;
+}
+
+interface EventRegistrationAdminItem {
+  id: string;
+  race_category: string;
+  food_options: string[] | null;
+  selected_meals: SelectedMealItem[] | null;
+  selected_categories: SelectedCategoryItem[] | null;
+  transponder_id: string | null;
+  total_paid: number;
+  created_at: string | null;
+  sbc_members: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string | null;
+    license_number: string | null;
+  } | null;
+}
+
 export default function AdminEventsPage() {
+  const { user: currentUser, profile: userProfile, isAdmin: userIsAdmin } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminPass, setAdminPass] = useState('');
   const [passError, setPassError] = useState('');
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [userProfile, setUserProfile] = useState<any>(null);
 
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<EventWithRegCount[]>([]);
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -86,40 +112,29 @@ export default function AdminEventsPage() {
   const [mealOptions, setMealOptions] = useState<MealOptionItem[]>(DEFAULT_MEALS);
 
   // Registrations Modal State
-  const [selectedEventForRegs, setSelectedEventForRegs] = useState<any | null>(null);
-  const [registrations, setRegistrations] = useState<any[]>([]);
+  const [selectedEventForRegs, setSelectedEventForRegs] = useState<ClubEvent | null>(null);
+  const [registrations, setRegistrations] = useState<EventRegistrationAdminItem[]>([]);
   const [loadingRegs, setLoadingRegs] = useState(false);
 
   const supabase = createClient();
 
-  useEffect(() => {
-    async function checkUser() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        setCurrentUser(user);
-        if (user) {
-          const { data: profile, error } = await supabase
-            .from('sbc_members')
-            .select('role, email')
-            .eq('id', user.id)
-            .single();
-
-          if (!error && profile) {
-            setUserProfile(profile);
-            const isSuper = user.email === 'stefga1@gmail.com';
-            const isSecondaryAdmin = profile.role === 'admin';
-            if (isSuper || isSecondaryAdmin) {
-              setIsAdmin(true);
-              fetchEvents();
-            }
-          }
-        }
-      } catch (err) {
-        console.error(err);
-      }
+  const fetchEvents = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await getAllEventsAdmin();
+    if (error) {
+      showMessage('error', `Erreur chargement : ${error}`);
+    } else {
+      setEvents((data as EventWithRegCount[]) || []);
     }
-    checkUser();
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    if (userIsAdmin) {
+      setIsAdmin(true);
+      fetchEvents();
+    }
+  }, [userIsAdmin, fetchEvents]);
 
   const handleAdminAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,7 +144,7 @@ export default function AdminEventsPage() {
       return;
     }
     const { error } = await supabase.auth.signInWithPassword({
-      email: currentUser.email,
+      email: currentUser.email!,
       password: adminPass,
     });
     if (error) {
@@ -138,17 +153,6 @@ export default function AdminEventsPage() {
       setIsAdmin(true);
       fetchEvents();
     }
-  };
-
-  const fetchEvents = async () => {
-    setLoading(true);
-    const { data, error } = await getAllEventsAdmin();
-    if (error) {
-      showMessage('error', `Erreur de chargement : ${error}`);
-    } else {
-      setEvents(data || []);
-    }
-    setLoading(false);
   };
 
   const showMessage = (type: 'success' | 'error', text: string) => {
@@ -194,7 +198,7 @@ export default function AdminEventsPage() {
     setMealOptions(DEFAULT_MEALS);
   };
 
-  const handleEditClick = (event: any) => {
+  const handleEditClick = (event: ClubEvent) => {
     setEditingEventId(event.id);
     setTitle(event.title || '');
     setDescription(event.description || '');
@@ -203,19 +207,19 @@ export default function AdminEventsPage() {
     setEndTime(event.end_time?.slice(0, 5) || '18:00');
     setCategoryBadge(event.category || 'Course Club SBC');
     setLocation(event.location || 'Seraing Buggy Track, Belgium');
-    setStatus(event.status || 'open');
+    setStatus((event.status as 'open' | 'closed' | 'draft') || 'open');
     setEventType(event.event_type || 'sbc_race');
     setHasRegistration(event.has_registration ?? true);
     setExternalLink(event.external_link || '');
     setMaxParticipants(event.max_participants ? String(event.max_participants) : '');
 
     const parsedCats = Array.isArray(event.categories) && event.categories.length > 0
-      ? event.categories
+      ? (event.categories as unknown as RaceCategoryItem[])
       : DEFAULT_CATEGORIES;
     setCategories(parsedCats);
 
     const parsedMeals = Array.isArray(event.meal_options) && event.meal_options.length > 0
-      ? event.meal_options
+      ? (event.meal_options as unknown as MealOptionItem[])
       : DEFAULT_MEALS;
     setMealOptions(parsedMeals);
 
@@ -282,7 +286,7 @@ export default function AdminEventsPage() {
     }
   };
 
-  const handleToggleStatus = async (event: any) => {
+  const handleToggleStatus = async (event: ClubEvent) => {
     const nextStatus = event.status === 'open' ? 'closed' : 'open';
     const { error } = await updateEventAdmin(event.id, { status: nextStatus });
     if (error) {
@@ -293,14 +297,14 @@ export default function AdminEventsPage() {
     }
   };
 
-  const handleOpenRegistrations = async (event: any) => {
+  const handleOpenRegistrations = async (event: ClubEvent) => {
     setSelectedEventForRegs(event);
     setLoadingRegs(true);
     const { data, error } = await getEventRegistrationsAdmin(event.id);
     if (error) {
       showMessage('error', `Erreur inscriptions : ${error}`);
     } else {
-      setRegistrations(data || []);
+      setRegistrations((data as EventRegistrationAdminItem[]) || []);
     }
     setLoadingRegs(false);
   };
@@ -310,7 +314,7 @@ export default function AdminEventsPage() {
     setCategories([...categories, { name: 'Nouvelle Catégorie', fee: 25, type: 'Electric' }]);
   };
 
-  const handleCategoryChange = (index: number, field: keyof RaceCategoryItem, val: any) => {
+  const handleCategoryChange = (index: number, field: keyof RaceCategoryItem, val: string | number) => {
     const updated = [...categories];
     updated[index] = { ...updated[index], [field]: val };
     setCategories(updated);
@@ -325,7 +329,7 @@ export default function AdminEventsPage() {
     setMealOptions([...mealOptions, { name: 'Option Repas', price: 10, desc: '' }]);
   };
 
-  const handleMealChange = (index: number, field: keyof MealOptionItem, val: any) => {
+  const handleMealChange = (index: number, field: keyof MealOptionItem, val: string | number) => {
     const updated = [...mealOptions];
     updated[index] = { ...updated[index], [field]: val };
     setMealOptions(updated);
@@ -631,7 +635,7 @@ export default function AdminEventsPage() {
                 </label>
                 <select
                   value={status}
-                  onChange={(e) => setStatus(e.target.value as any)}
+                  onChange={(e) => setStatus(e.target.value as 'open' | 'closed' | 'draft')}
                   className="w-full bg-background border border-[#353535] rounded px-2 py-2 text-white focus:outline-none focus:border-primary font-mono text-xs"
                 >
                   <option value="open">🟢 Ouvert / Affiché</option>
@@ -671,99 +675,18 @@ export default function AdminEventsPage() {
 
             {/* Sections Tarifs & Repas — UNIQUEMENT SI hasRegistration === true */}
             {hasRegistration ? (
-              <>
-                {/* Section: Catégories & Tarifs */}
-                <div className="pt-2 border-t border-[#353535]/60 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] uppercase tracking-wider text-white font-bold flex items-center gap-1.5">
-                      <DollarSign className="w-3.5 h-3.5 text-primary" />
-                      Catégories de Course & Tarifs
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleAddCategory}
-                      className="text-[10px] text-primary hover:underline flex items-center gap-1 cursor-pointer"
-                    >
-                      <Plus className="w-3 h-3" /> Ajouter catégorie
-                    </button>
-                  </div>
-
-                  <div className="space-y-2">
-                    {categories.map((cat, idx) => (
-                      <div key={idx} className="flex items-center gap-2 bg-surface-dim p-2 rounded border border-[#353535]">
-                        <input
-                          type="text"
-                          placeholder="Nom catégorie"
-                          value={cat.name}
-                          onChange={(e) => handleCategoryChange(idx, 'name', e.target.value)}
-                          className="flex-1 bg-background border border-[#353535] rounded px-2 py-1 text-white text-xs"
-                        />
-                        <input
-                          type="number"
-                          placeholder="Prix €"
-                          value={cat.fee}
-                          onChange={(e) => handleCategoryChange(idx, 'fee', parseFloat(e.target.value) || 0)}
-                          className="w-20 bg-background border border-[#353535] rounded px-2 py-1 text-primary text-xs text-right font-bold"
-                        />
-                        <span className="text-foreground/40 text-[10px]">€</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveCategory(idx)}
-                          className="text-foreground/40 hover:text-secondary p-1 cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Section: Options Repas */}
-                <div className="pt-2 border-t border-[#353535]/60 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] uppercase tracking-wider text-white font-bold flex items-center gap-1.5">
-                      <Utensils className="w-3.5 h-3.5 text-primary" />
-                      Options Repas / Restauration
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleAddMeal}
-                      className="text-[10px] text-primary hover:underline flex items-center gap-1 cursor-pointer"
-                    >
-                      <Plus className="w-3 h-3" /> Ajouter repas
-                    </button>
-                  </div>
-
-                  <div className="space-y-2">
-                    {mealOptions.map((meal, idx) => (
-                      <div key={idx} className="flex items-center gap-2 bg-surface-dim p-2 rounded border border-[#353535]">
-                        <input
-                          type="text"
-                          placeholder="Nom du repas"
-                          value={meal.name}
-                          onChange={(e) => handleMealChange(idx, 'name', e.target.value)}
-                          className="flex-1 bg-background border border-[#353535] rounded px-2 py-1 text-white text-xs"
-                        />
-                        <input
-                          type="number"
-                          placeholder="Prix €"
-                          value={meal.price}
-                          onChange={(e) => handleMealChange(idx, 'price', parseFloat(e.target.value) || 0)}
-                          className="w-20 bg-background border border-[#353535] rounded px-2 py-1 text-success text-xs text-right font-bold"
-                        />
-                        <span className="text-foreground/40 text-[10px]">€</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveMeal(idx)}
-                          className="text-foreground/40 hover:text-secondary p-1 cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
+              <div className="pt-2 border-t border-[#353535]/60">
+                <CategoryMealFields
+                  categories={categories}
+                  onCategoryChange={handleCategoryChange}
+                  onAddCategory={handleAddCategory}
+                  onRemoveCategory={handleRemoveCategory}
+                  mealOptions={mealOptions}
+                  onMealChange={handleMealChange}
+                  onAddMeal={handleAddMeal}
+                  onRemoveMeal={handleRemoveMeal}
+                />
+              </div>
             ) : (
               <div className="p-3 bg-surface border border-[#353535] rounded text-center text-foreground/45 text-[11px] font-mono">
                 Sections tarifs & repas masquées (Inscriptions désactivées sur l'app).
@@ -958,31 +881,13 @@ export default function AdminEventsPage() {
                             </div>
                           </td>
                           <td className="p-3">
-                            {Array.isArray(reg.selected_categories) && reg.selected_categories.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {reg.selected_categories.map((c: any, idx: number) => (
-                                  <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded bg-surface border border-[#353535] text-primary font-bold text-[10px]">
-                                    {c.name}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-primary font-bold">{reg.race_category}</span>
-                            )}
+                            <span className="text-primary font-bold">{reg.race_category}</span>
                           </td>
                           <td className="p-3 text-foreground/60">
                             {reg.transponder_id || 'Location club'}
                           </td>
                           <td className="p-3 text-[11px] text-foreground/80">
-                            {Array.isArray(reg.selected_meals) && reg.selected_meals.length > 0 ? (
-                              <div className="flex flex-wrap gap-1.5">
-                                {reg.selected_meals.map((m: any, idx: number) => (
-                                  <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary font-bold text-[10px]">
-                                    {m.name} x{m.quantity}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : Array.isArray(reg.food_options) && reg.food_options.length > 0 ? (
+                            {Array.isArray(reg.food_options) && reg.food_options.length > 0 ? (
                               <div className="flex flex-wrap gap-1.5">
                                 {reg.food_options.map((opt: string, idx: number) => (
                                   <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary font-bold text-[10px]">
@@ -991,11 +896,11 @@ export default function AdminEventsPage() {
                                 ))}
                               </div>
                             ) : (
-                              <span className="text-foreground/40 text-[10px]">Aucun</span>
+                              <span className="text-foreground/40 italic">Aucun repas</span>
                             )}
                           </td>
                           <td className="p-3 text-right font-bold text-success">
-                            €{parseFloat(reg.total_paid || 0).toFixed(2)}
+                            €{Number(reg.total_paid || 0).toFixed(2)}
                           </td>
                         </tr>
                       ))}

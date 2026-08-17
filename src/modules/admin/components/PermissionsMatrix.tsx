@@ -1,9 +1,10 @@
 import React from 'react';
 import { MODULES_REGISTRY } from '../permissions.config';
 import { ShieldAlert, ShieldCheck } from 'lucide-react';
+import { ModulePermissionsMap } from '@/types/models';
 
 interface PermissionsMatrixProps {
-  permissions: Record<string, string[]>;
+  permissions: ModulePermissionsMap;
   onChange: (newPermissions: Record<string, string[]>) => void;
   disabled?: boolean;
 }
@@ -23,11 +24,10 @@ export function PermissionsMatrix({ permissions = {}, onChange, disabled = false
       } else {
         updatedModulePermissions = [...currentModulePermissions, actionId];
       }
-    } else if (typeof currentModulePermissions === 'object') {
+    } else if (typeof currentModulePermissions === 'object' && currentModulePermissions !== null) {
       // Cas de conversion d'un ancien format objet en tableau
-      const keys = Object.keys(currentModulePermissions).filter(
-        (key) => !!(currentModulePermissions as any)[key]
-      );
+      const record = currentModulePermissions as Record<string, boolean>;
+      const keys = Object.keys(record).filter((key) => !!record[key]);
       if (keys.includes(actionId)) {
         updatedModulePermissions = keys.filter((id) => id !== actionId);
       } else {
@@ -37,10 +37,15 @@ export function PermissionsMatrix({ permissions = {}, onChange, disabled = false
       updatedModulePermissions = [actionId];
     }
 
-    const nextPermissions = {
-      ...permissions,
-      [moduleId]: updatedModulePermissions,
-    };
+    const nextPermissions: Record<string, string[]> = {};
+    for (const [mod, acts] of Object.entries(permissions)) {
+      if (Array.isArray(acts)) {
+        nextPermissions[mod] = acts;
+      } else if (typeof acts === 'object' && acts !== null) {
+        nextPermissions[mod] = Object.keys(acts).filter((k) => !!(acts as Record<string, boolean>)[k]);
+      }
+    }
+    nextPermissions[moduleId] = updatedModulePermissions;
 
     onChange(nextPermissions);
   };
@@ -53,8 +58,8 @@ export function PermissionsMatrix({ permissions = {}, onChange, disabled = false
       return modulePermissions.includes(actionId);
     }
     
-    if (typeof modulePermissions === 'object') {
-      return !!(modulePermissions as any)[actionId];
+    if (typeof modulePermissions === 'object' && modulePermissions !== null) {
+      return !!(modulePermissions as Record<string, boolean>)[actionId];
     }
 
     return false;
@@ -73,58 +78,42 @@ export function PermissionsMatrix({ permissions = {}, onChange, disabled = false
         {MODULES_REGISTRY.map((module) => (
           <div key={module.id} className="pt-3 first:pt-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="max-w-md">
-              <div className="text-white text-xs font-bold font-sans">
-                {module.label}
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-white uppercase text-[12px]">{module.label}</span>
+                <span className="text-[10px] text-[#A0A0A0] bg-[#202020] px-1.5 py-0.5 rounded border border-[#353535]">
+                  {module.id}
+                </span>
               </div>
-              <p className="text-[10px] text-foreground/45 leading-relaxed font-sans">
-                {module.description}
-              </p>
+              <p className="text-[11px] text-[#A0A0A0] mt-0.5">{module.description}</p>
             </div>
 
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-wrap items-center gap-3">
               {module.actions.map((action) => {
-                const checked = isChecked(module.id, action.id);
+                const active = isChecked(module.id, action.id);
                 return (
                   <label
                     key={action.id}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded border transition-all select-none cursor-pointer ${
-                      checked
-                        ? 'bg-primary/5 border-primary/40 text-primary hover:bg-primary/10'
-                        : 'bg-surface border-[#353535]/60 text-foreground/40 hover:border-foreground/20 hover:text-foreground/60'
-                    } ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded border text-[11px] cursor-pointer transition-colors ${
+                      active
+                        ? 'bg-primary/10 border-primary text-primary font-bold shadow-[0_0_8px_rgba(255,107,0,0.2)]'
+                        : 'bg-[#151515] border-[#353535] text-[#A0A0A0] hover:text-white'
+                    } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <input
                       type="checkbox"
-                      checked={checked}
+                      className="hidden"
+                      checked={active}
                       disabled={disabled}
                       onChange={() => handleTogglePermission(module.id, action.id)}
-                      className="hidden"
                     />
                     <div
-                      className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-all ${
-                        checked
-                          ? 'border-primary bg-primary text-black'
-                          : 'border-[#353535]/80 bg-background'
+                      className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors ${
+                        active ? 'bg-primary border-primary text-black' : 'border-[#444]'
                       }`}
                     >
-                      {checked && (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="w-2.5 h-2.5"
-                        >
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
+                      {active && <span className="text-[10px] leading-none font-bold">✓</span>}
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider">
-                      {action.label}
-                    </span>
+                    <span>{action.label}</span>
                   </label>
                 );
               })}
@@ -134,9 +123,11 @@ export function PermissionsMatrix({ permissions = {}, onChange, disabled = false
       </div>
 
       {disabled && (
-        <div className="p-2 rounded bg-secondary/5 border border-secondary/15 text-secondary text-[10px] flex items-center gap-2 mt-2 leading-relaxed">
-          <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
-          <span>Lecture seule. Seul le Super-Administrateur peut modifier ces autorisations.</span>
+        <div className="flex items-center gap-2 text-warning/80 bg-warning/10 p-2.5 rounded border border-warning/20 text-[11px] mt-2">
+          <ShieldAlert className="w-4 h-4 shrink-0" />
+          <span>
+            Les droits sont gérés uniquement pour les administrateurs secondaires. Les membres ou visiteurs ne peuvent pas recevoir de permissions individuelles.
+          </span>
         </div>
       )}
     </div>

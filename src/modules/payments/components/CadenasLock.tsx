@@ -30,8 +30,12 @@ export default function CadenasLock({ userId, onUnlocked }: CadenasLockProps) {
       } else {
         setErrorMsg(result.error || "Une erreur est survenue.");
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "Impossible de communiquer avec le serveur.");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setErrorMsg(err.message);
+      } else {
+        setErrorMsg("Impossible de communiquer avec le serveur.");
+      }
     } finally {
       setLoading(false);
     }

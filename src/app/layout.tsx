@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import Navbar from "@/components/app-shell/navbar";
+import AppShell from "@/components/app-shell/AppShell";
 import ServiceWorkerRegister from "@/components/pwa/ServiceWorkerRegister";
+import { AuthProvider } from "@/contexts/AuthContext";
 import { SimulationProvider } from "@/modules/admin/contexts/SimulationContext";
 import { PresenceZoneProvider } from "@/modules/presence/contexts/PresenceZoneContext";
 
@@ -41,22 +42,15 @@ export default function RootLayout({
     <html lang="fr" className="h-full antialiased dark">
       <body className="min-h-full flex flex-col bg-background text-foreground selection:bg-primary selection:text-black">
         <ServiceWorkerRegister />
-        <SimulationProvider>
-          <PresenceZoneProvider>
-            <div className="flex flex-col min-h-screen">
-              {/* Top Navbar */}
-              <Navbar />
-              
-              {/* Main App Body */}
-              <div className="flex flex-col flex-1">
-                {/* Page Content - Edge-to-edge for full-width components */}
-                <main className="flex-1">
-                  {children}
-                </main>
-              </div>
-            </div>
-          </PresenceZoneProvider>
-        </SimulationProvider>
+        <AuthProvider>
+          <SimulationProvider>
+            <PresenceZoneProvider>
+              <AppShell>
+                {children}
+              </AppShell>
+            </PresenceZoneProvider>
+          </SimulationProvider>
+        </AuthProvider>
       </body>
     </html>
   );

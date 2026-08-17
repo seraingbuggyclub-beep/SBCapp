@@ -1,16 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { getMemberProfile } from '@/modules/members/actions';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 import {
   getActiveEvents,
-  registerForEvent,
-  updateEventRegistration,
   getMemberRegistrations,
-  SelectedCategoryItem,
-  SelectedMealItem,
 } from '@/modules/events/actions';
+import { useEventRegistration } from '@/modules/events/hooks/useEventRegistration';
 import CadenasLock from '@/modules/payments/components/CadenasLock';
 import FbaDisclaimer from '@/modules/presence/components/FbaDisclaimer';
 import {
@@ -31,207 +27,114 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import Link from 'next/link';
+import { ClubEvent, EventRegistration, SelectedCategoryItem } from '@/types/models';
+
+interface RegistrationWithEvent extends EventRegistration {
+  sbc_events?: {
+    id: string;
+    title: string;
+    description: string | null;
+    event_date: string;
+    start_time?: string;
+    location: string;
+  } | null;
+}
 
 export default function EventsPage() {
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [events, setEvents] = useState<any[]>([]);
-  const [registrations, setRegistrations] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user, profile, loading: authLoading, refresh: refreshAuth } = useAuth();
+  const [events, setEvents] = useState<ClubEvent[]>([]);
+  const [registrations, setRegistrations] = useState<RegistrationWithEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
 
-  // Selected event for registration
-  const [selectedEvent, setSelectedEvent] = useState<any>(null);
-  const [editingRegistrationId, setEditingRegistrationId] = useState<string | null>(null);
-  
-  // Multi-select categories
-  const [selectedCategories, setSelectedCategories] = useState<SelectedCategoryItem[]>([]);
-  
-  // Selected meal quantities: { [mealName]: quantity } (0 to 10)
-  const [mealQuantities, setMealQuantities] = useState<Record<string, number>>({});
-  
-  const [transponderId, setTransponderId] = useState('');
-  const [regLoading, setRegLoading] = useState(false);
-  const [regSuccess, setRegSuccess] = useState(false);
-  const [regError, setRegError] = useState('');
+  const {
+    selectedEvent,
+    editingRegistrationId,
+    selectedCategories,
+    mealQuantities,
+    transponderId,
+    loading: regLoading,
+    success: regSuccess,
+    error: regError,
+    setTransponderId,
+    selectEvent,
+    editRegistration,
+    resetRegistration,
+    toggleCategory,
+    updateMealQuantity,
+    getEventCategories,
+    getEventMeals,
+    getSelectedMealsArray,
+    calculateTotal,
+    isWithin48Hours,
+    submit,
+  } = useEventRegistration({
+    defaultTransponder: profile?.transponder_number,
+  });
 
-  const supabase = createClient();
-
-  const loadData = async () => {
-    setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    // 1. Charger les événements réels
-    const { data: eventsData } = await getActiveEvents();
-    setEvents(eventsData || []);
-
-    if (session?.user) {
-      setUser(session.user);
-      
-      // 2. Charger le profil
-      const { data: profileData } = await getMemberProfile(session.user.id);
-      setProfile(profileData);
-
-      // 3. Charger les inscriptions existantes
-      const { data: regsData } = await getMemberRegistrations(session.user.id);
-      setRegistrations(regsData || []);
-    } else {
-      setUser(null);
-      setProfile(null);
-      setRegistrations([]);
-    }
-    setLoading(false);
-  };
+  const isMountedRef = React.useRef(true);
 
   useEffect(() => {
-    loadData();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      loadData();
-    });
-
+    isMountedRef.current = true;
     return () => {
-      subscription.unsubscribe();
+      isMountedRef.current = false;
     };
   }, []);
 
-  const isWithin48Hours = (eventDate: string, startTime?: string) => {
-    const timeStr = startTime || '09:00:00';
-    const eventDateTime = new Date(`${eventDate}T${timeStr}`);
-    const now = new Date();
-    const diffMs = eventDateTime.getTime() - now.getTime();
-    return diffMs < 48 * 60 * 60 * 1000;
-  };
+  const loadMemberRegs = useCallback(async (userId: string) => {
+    const { data: regsData } = await getMemberRegistrations(userId);
+    if (isMountedRef.current) {
+      setRegistrations((regsData as RegistrationWithEvent[]) || []);
+    }
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    async function fetchEvents() {
+      setEventsLoading(true);
+      const { data: eventsData } = await getActiveEvents();
+      if (isMounted) {
+        setEvents(eventsData || []);
+        setEventsLoading(false);
+      }
+    }
+
+    fetchEvents();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      loadMemberRegs(user.id);
+    } else {
+      setRegistrations([]);
+    }
+  }, [user, loadMemberRegs]);
 
   const getExistingRegistration = (eventId: string) => {
     return registrations.find((r) => r.event_id === eventId || r.sbc_events?.id === eventId);
   };
 
-  const handleSelectEvent = (event: any) => {
-    setSelectedEvent(event);
-    setEditingRegistrationId(null);
-    setMealQuantities({});
-    setTransponderId(profile?.transponder_number || '');
-    setRegError('');
-    setRegSuccess(false);
-
-    // Initialiser avec la première catégorie cochée par défaut
-    const cats = getEventCategories(event);
-    if (cats.length > 0) {
-      setSelectedCategories([cats[0]]);
-    } else {
-      setSelectedCategories([{ name: 'Générale', fee: parseFloat(event.registration_fee || 0) }]);
-    }
-  };
-
-  const handleEditRegistration = (event: any, existingReg: any) => {
-    setSelectedEvent(event);
-    setEditingRegistrationId(existingReg.id);
-    setRegError('');
-    setRegSuccess(false);
-
-    // Pré-remplir les catégories
-    if (Array.isArray(existingReg.selected_categories) && existingReg.selected_categories.length > 0) {
-      setSelectedCategories(existingReg.selected_categories);
-    } else if (existingReg.race_category) {
-      const splitNames = existingReg.race_category.split(',').map((s: string) => s.trim());
-      const availableCats = getEventCategories(event);
-      const matched = availableCats.filter((c) => splitNames.includes(c.name));
-      setSelectedCategories(matched.length > 0 ? matched : [{ name: existingReg.race_category, fee: parseFloat(event.registration_fee || 0) }]);
-    } else {
-      const cats = getEventCategories(event);
-      setSelectedCategories(cats.slice(0, 1));
-    }
-
-    // Pré-remplir les quantités de repas
-    const mealMap: Record<string, number> = {};
-    if (Array.isArray(existingReg.selected_meals) && existingReg.selected_meals.length > 0) {
-      existingReg.selected_meals.forEach((m: any) => {
-        mealMap[m.name] = m.quantity || 0;
-      });
-    } else if (Array.isArray(existingReg.food_options) && existingReg.food_options.length > 0) {
-      existingReg.food_options.forEach((opt: string) => {
-        const match = opt.match(/(.+)\s+x(\d+)/);
-        if (match) {
-          mealMap[match[1].trim()] = parseInt(match[2], 10);
-        }
-      });
-    }
-    setMealQuantities(mealMap);
-
-    // Pré-remplir le transpondeur
-    setTransponderId(existingReg.transponder_id || '');
+  const handleStartEdit = (event: ClubEvent, reg: RegistrationWithEvent) => {
+    editRegistration(event, reg);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const getEventCategories = (event: any): SelectedCategoryItem[] => {
-    if (Array.isArray(event?.categories) && event.categories.length > 0) {
-      return event.categories;
-    }
-    return [
-      { name: 'Buggy 1/10 2WD', fee: 10, type: 'Electric' },
-      { name: 'Buggy 1/10 4WD', fee: 10, type: 'Electric' },
-      { name: 'Truck 1/10 2wD', fee: 10, type: 'Electric' },
-      { name: 'Buggy 1/8', fee: 15, type: 'Nitro / Elec' },
-      { name: 'Truggy 1/8', fee: 15, type: 'Nitro / Elec' },
-      { name: 'Vintage 1/10', fee: 10, type: 'Electric' },
-      { name: 'Rallye Game 1/10', fee: 10, type: 'Electric' },
-    ];
-  };
-
-  const toggleCategory = (cat: SelectedCategoryItem) => {
-    const isSelected = selectedCategories.some((c) => c.name === cat.name);
-    if (isSelected) {
-      setSelectedCategories(selectedCategories.filter((c) => c.name !== cat.name));
-    } else {
-      setSelectedCategories([...selectedCategories, cat]);
-    }
-  };
-
-  const getEventMeals = (event: any) => {
-    if (Array.isArray(event?.meal_options) && event.meal_options.length > 0) {
-      return event.meal_options;
-    }
-    return [
-      { name: 'Pain garni Hamburger', price: 4.5, desc: 'Pain garni avec hamburger chaud' },
-      { name: 'Pain garni Mexicanos', price: 4.5, desc: 'Pain garni avec mexicanos chaud' },
-      { name: 'Pain garni Saucisse géante', price: 4.5, desc: 'Pain garni avec saucisse géante' },
-    ];
-  };
-
-  const updateMealQuantity = (mealName: string, delta: number) => {
-    setMealQuantities((prev) => {
-      const current = prev[mealName] || 0;
-      const next = Math.min(10, Math.max(0, current + delta));
-      return { ...prev, [mealName]: next };
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    await submit(user.id, async () => {
+      await loadMemberRegs(user.id);
+      setTimeout(() => {
+        resetRegistration();
+      }, 2000);
     });
   };
 
-  const getSelectedMealsArray = (): SelectedMealItem[] => {
-    if (!selectedEvent) return [];
-    const meals = getEventMeals(selectedEvent);
-    return meals
-      .filter((m: any) => (mealQuantities[m.name] || 0) > 0)
-      .map((m: any) => ({
-        name: m.name,
-        quantity: mealQuantities[m.name],
-        unit_price: parseFloat(m.price) || 0,
-      }));
-  };
-
-  const calculateCategoriesTotal = () => {
-    return selectedCategories.reduce((acc, cat) => acc + (parseFloat(cat.fee as any) || 0), 0);
-  };
-
-  const calculateMealsTotal = () => {
-    const meals = getSelectedMealsArray();
-    return meals.reduce((acc, m) => acc + m.quantity * m.unit_price, 0);
-  };
-
-  const calculateTotal = () => {
-    return calculateCategoriesTotal() + calculateMealsTotal();
-  };
-
-  const getEventTypeBadge = (event: any) => {
+  const getEventTypeBadge = (event: ClubEvent) => {
     const type = event.event_type || 'sbc_race';
     switch (type) {
       case 'sbc_race':
@@ -262,84 +165,7 @@ export default function EventsPage() {
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !selectedEvent) return;
-
-    if (selectedCategories.length === 0) {
-      setRegError('Veuillez sélectionner au moins une catégorie de course.');
-      return;
-    }
-
-    setRegLoading(true);
-    setRegError('');
-    setRegSuccess(false);
-
-    try {
-      const total = calculateTotal();
-      const activeMeals = getSelectedMealsArray();
-
-      if (editingRegistrationId) {
-        // Mode Mise à Jour
-        const { error } = await updateEventRegistration(editingRegistrationId, {
-          selected_categories: selectedCategories,
-          selected_meals: activeMeals,
-          transponder_id: transponderId,
-          total_paid: total,
-        });
-
-        if (error) {
-          setRegError(error);
-        } else {
-          setRegSuccess(true);
-          const { data: regsData } = await getMemberRegistrations(user.id);
-          setRegistrations(regsData || []);
-          
-          setTimeout(() => {
-            setSelectedEvent(null);
-            setEditingRegistrationId(null);
-            setRegSuccess(false);
-            setSelectedCategories([]);
-            setMealQuantities({});
-            setTransponderId('');
-          }, 2000);
-        }
-      } else {
-        // Mode Nouvelle Inscription
-        const { error } = await registerForEvent({
-          event_id: selectedEvent.id,
-          member_id: user.id,
-          selected_categories: selectedCategories,
-          selected_meals: activeMeals,
-          transponder_id: transponderId,
-          total_paid: total,
-        });
-
-        if (error) {
-          setRegError(error);
-        } else {
-          setRegSuccess(true);
-          const { data: regsData } = await getMemberRegistrations(user.id);
-          setRegistrations(regsData || []);
-          
-          setTimeout(() => {
-            setSelectedEvent(null);
-            setEditingRegistrationId(null);
-            setRegSuccess(false);
-            setSelectedCategories([]);
-            setMealQuantities({});
-            setTransponderId('');
-          }, 2000);
-        }
-      }
-    } catch (err: any) {
-      setRegError(err.message || 'Erreur lors de l\'enregistrement');
-    } finally {
-      setRegLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (authLoading || eventsLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-100 gap-2 font-mono text-xs">
         <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
@@ -348,7 +174,7 @@ export default function EventsPage() {
     );
   }
 
-  // Not Logged In -> Show warning and calendar preview only
+  // Utilisateur non connecté -> Alerte + aperçu public
   if (!user) {
     return (
       <div className="max-w-4xl mx-auto space-y-8 py-4">
@@ -365,7 +191,7 @@ export default function EventsPage() {
           </Link>
         </div>
 
-        {/* Public list of events from DB */}
+        {/* Liste publique des courses */}
         <div className="space-y-4">
           <h3 className="font-anybody font-black text-lg uppercase tracking-tight sport-skew text-white">
             Prochaines Courses & Activités
@@ -386,7 +212,7 @@ export default function EventsPage() {
                           {typeBadge.label}
                         </span>
                         <span className="text-[10px] text-foreground/50 font-mono flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-primary" />
+                          <Calendar className="w-3.5 h-3.5 text-primary" />
                           {new Date(event.event_date).toLocaleDateString('fr-BE')}
                         </span>
                       </div>
@@ -398,13 +224,13 @@ export default function EventsPage() {
                       )}
                       {event.location && (
                         <p className="text-[10px] text-foreground/40 font-mono flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-primary" /> {event.location}
+                          <MapPin className="w-3.5 h-3.5 text-primary" /> {event.location}
                         </p>
                       )}
                     </div>
                     <div className="text-right font-mono text-xs text-foreground/50 shrink-0">
                       {event.has_registration !== false ? (
-                        <div className="text-primary font-bold">À partir de €{parseFloat(event.registration_fee || 0).toFixed(2)}</div>
+                        <div className="text-primary font-bold">À partir de €{Number(event.registration_fee || 0).toFixed(2)}</div>
                       ) : event.external_link ? (
                         <a
                           href={event.external_link}
@@ -413,7 +239,7 @@ export default function EventsPage() {
                           className="inline-flex items-center gap-1 text-blue-400 hover:underline font-bold text-xs"
                         >
                           <span>Site officiel</span>
-                          <ExternalLink className="w-3 h-3" />
+                          <ExternalLink className="w-3.5 h-3.5" />
                         </a>
                       ) : (
                         <span className="text-foreground/40 text-[10px]">Informatif</span>
@@ -429,11 +255,55 @@ export default function EventsPage() {
     );
   }
 
-  // Pending user -> Locked by cadenas
+  // Engagements ROI / Assurance non acceptés -> Blocage
+  const hasAgreements = Boolean(profile?.roi_accepted && profile?.insurance_ack);
+  if (user && !hasAgreements) {
+    return (
+      <div className="max-w-md mx-auto py-10 space-y-6 text-center">
+        <div className="premium-card p-6 md:p-8 rounded-lg border-2 border-secondary bg-secondary/10 shadow-[0_0_30px_rgba(255,50,0,0.2)]">
+          <div className="w-12 h-12 rounded-full bg-secondary/20 flex items-center justify-center mx-auto mb-4 border border-secondary text-secondary">
+            <Lock className="w-6 h-6" />
+          </div>
+          <h3 className="font-anybody font-black text-lg uppercase tracking-tight sport-skew text-white mb-2">
+            Inscriptions Verrouillées
+          </h3>
+          <p className="text-xs text-foreground/80 leading-relaxed mb-6 font-mono">
+            Pour vous inscrire aux courses officielles du club, vous devez obligatoirement accepter le <strong>Règlement d'Ordre Intérieur (ROI)</strong> et l'<strong>Assurance FBA</strong> sur votre profil pilote.
+          </p>
+          <Link
+            href="/dashboard#engagements-section"
+            className="premium-btn text-xs w-full flex items-center justify-center"
+          >
+            <span className="transform skew-x-8">Valider mes engagements sur le Dashboard</span>
+          </Link>
+        </div>
+
+        <FbaDisclaimer />
+      </div>
+    );
+  }
+
+  // Cotisation non payée
   if (profile && profile.payment_status !== 'paid') {
     return (
-      <div className="max-w-md mx-auto py-10 space-y-6">
-        <CadenasLock userId={user.id} onUnlocked={loadData} />
+      <div className="max-w-md mx-auto py-10 space-y-6 text-center">
+        <div className="premium-card p-6 md:p-8 rounded-lg border border-[#353535]">
+          <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center mx-auto mb-4 border border-[#353535] text-secondary">
+            <Lock className="w-6 h-6" />
+          </div>
+          <h3 className="font-anybody font-black text-lg uppercase tracking-tight sport-skew text-white mb-2">
+            Cotisation Non Acquittée
+          </h3>
+          <p className="text-xs text-foreground/60 leading-relaxed mb-6 font-mono">
+            Les inscriptions aux courses du club nécessitent une cotisation annuelle ou journalière valide.
+          </p>
+          <Link
+            href="/dashboard"
+            className="premium-btn text-xs w-full flex items-center justify-center"
+          >
+            <span className="transform skew-x-8">Accéder à mon Espace Pilote</span>
+          </Link>
+        </div>
         <FbaDisclaimer />
       </div>
     );
@@ -455,19 +325,12 @@ export default function EventsPage() {
 
       <FbaDisclaimer />
 
-      {/* Main Registration Block */}
+      {/* Bloc de Formulaire d'Inscription / Modification */}
       {selectedEvent ? (
         <div className="space-y-3">
-          {/* Bouton explicite Retour aux événements */}
           <button
             type="button"
-            onClick={() => {
-              setSelectedEvent(null);
-              setEditingRegistrationId(null);
-              setSelectedCategories([]);
-              setMealQuantities({});
-              setRegError('');
-            }}
+            onClick={resetRegistration}
             className="inline-flex items-center gap-2 text-xs font-mono text-foreground/60 hover:text-primary transition-colors cursor-pointer group py-1"
           >
             <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
@@ -488,21 +351,15 @@ export default function EventsPage() {
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setSelectedEvent(null);
-                  setEditingRegistrationId(null);
-                  setSelectedCategories([]);
-                  setMealQuantities({});
-                  setRegError('');
-                }}
+                onClick={resetRegistration}
                 className="text-xs text-foreground/50 hover:text-primary font-mono uppercase cursor-pointer transition-colors"
               >
                 Annuler
               </button>
             </div>
 
-            <form onSubmit={handleRegister} className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-[#353535]">
-              {/* Left: Category and options */}
+            <form onSubmit={handleFormSubmit} className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-[#353535]">
+              {/* Colonne gauche : Catégories et options */}
               <div className="lg:col-span-8 p-6 space-y-6">
                 {regError && (
                   <div className="p-3 rounded bg-secondary/10 border border-secondary/20 text-secondary text-xs font-mono">
@@ -519,7 +376,7 @@ export default function EventsPage() {
                   </div>
                 )}
 
-                {/* Race categories (Multi-Select) */}
+                {/* 1. Catégories de Course (Multi-Select) */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="font-anybody font-black text-xs uppercase tracking-wider text-white sport-skew flex items-center gap-2">
@@ -566,7 +423,7 @@ export default function EventsPage() {
 
                           <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#353535]/40">
                             <span className="text-xs font-mono font-bold text-primary">
-                              €{parseFloat(item.fee as any).toFixed(2)}
+                              €{Number(item.fee || 0).toFixed(2)}
                             </span>
                             <span className="text-[9px] font-mono text-foreground/50">
                               {isSelected ? 'Cochée' : 'Cliquer pour ajouter'}
@@ -584,16 +441,16 @@ export default function EventsPage() {
                   )}
                 </div>
 
-                {/* Food & Transponder */}
+                {/* 2. Repas & Télémétrie */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  {/* Food options with Quantity Selector [-] [ 0 ] [+] */}
+                  {/* Restauration avec compteur */}
                   <div>
                     <h4 className="font-anybody font-black text-xs uppercase tracking-wider text-white sport-skew mb-3 flex items-center gap-1.5">
                       <Utensils className="w-3.5 h-3.5 text-primary" />
                       2. Repas & Restauration (Quantité 0 à 10)
                     </h4>
                     <div className="space-y-2.5">
-                      {getEventMeals(selectedEvent).map((meal: any) => {
+                      {getEventMeals(selectedEvent).map((meal) => {
                         const qty = mealQuantities[meal.name] || 0;
                         return (
                           <div
@@ -608,13 +465,13 @@ export default function EventsPage() {
                               <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
                                 <span>{meal.name}</span>
                                 <span className="text-primary font-mono text-[11px] font-bold">
-                                  €{parseFloat(meal.price).toFixed(2)}/u
+                                  €{Number(meal.price).toFixed(2)}/u
                                 </span>
                               </div>
                               {meal.desc && <div className="text-[10px] text-foreground/50">{meal.desc}</div>}
                               {qty > 0 && (
                                 <div className="text-[10px] text-success font-mono font-bold">
-                                  Total : €{(qty * parseFloat(meal.price)).toFixed(2)}
+                                  Total : €{(qty * Number(meal.price)).toFixed(2)}
                                 </div>
                               )}
                             </div>
@@ -646,7 +503,7 @@ export default function EventsPage() {
                     </div>
                   </div>
 
-                  {/* Transponder ID */}
+                  {/* Transpondeur */}
                   <div>
                     <h4 className="font-anybody font-black text-xs uppercase tracking-wider text-white sport-skew mb-3">
                       3. Matériel Télémétrie
@@ -670,14 +527,13 @@ export default function EventsPage() {
                 </div>
               </div>
 
-              {/* Right: Summary */}
+              {/* Colonne droite : Résumé Facturation */}
               <div className="lg:col-span-4 p-6 bg-surface-dim flex flex-col justify-between space-y-6">
                 <div className="space-y-4">
                   <h4 className="font-anybody font-black text-xs uppercase tracking-wider text-white sport-skew border-b border-[#353535] pb-2">
                     Résumé Facturation
                   </h4>
                   <div className="space-y-2 text-xs font-mono">
-                    {/* Catégories sélectionnées */}
                     {selectedCategories.length === 0 ? (
                       <div className="text-secondary text-[11px]">
                         Aucune catégorie cochée
@@ -686,12 +542,11 @@ export default function EventsPage() {
                       selectedCategories.map((c) => (
                         <div key={c.name} className="flex justify-between">
                           <span className="text-foreground/55 truncate max-w-40">Cat. {c.name} :</span>
-                          <span className="text-primary font-bold">€{parseFloat(c.fee as any).toFixed(2)}</span>
+                          <span className="text-primary font-bold">€{Number(c.fee || 0).toFixed(2)}</span>
                         </div>
                       ))
                     )}
 
-                    {/* Repas sélectionnés */}
                     {getSelectedMealsArray().map((m) => (
                       <div key={m.name} className="flex justify-between">
                         <span className="text-foreground/55 truncate max-w-40">{m.name} (x{m.quantity}) :</span>
@@ -730,7 +585,7 @@ export default function EventsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Left: Events list from DB */}
+          {/* Liste des courses disponibles */}
           <div className="md:col-span-2 space-y-4">
             <h3 className="font-anybody font-black text-sm uppercase tracking-wider text-white sport-skew border-b border-[#353535] pb-2">
               Courses & Compétitions Ouvertes ({events.length})
@@ -755,7 +610,6 @@ export default function EventsPage() {
                           {typeBadge.label}
                         </span>
 
-                        {/* Badge distinctif Déjà Inscrit */}
                         {existingReg && (
                           <span className="px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[9px] font-mono font-bold uppercase tracking-wider flex items-center gap-1">
                             <Check className="w-3 h-3 stroke-[3]" /> DÉJÀ INSCRIT
@@ -768,7 +622,7 @@ export default function EventsPage() {
                         </span>
                         {event.location && (
                           <span className="text-[10px] text-foreground/40 font-mono flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-primary" /> {event.location}
+                            <MapPin className="w-3.5 h-3.5 text-primary" /> {event.location}
                           </span>
                         )}
                       </div>
@@ -785,7 +639,7 @@ export default function EventsPage() {
                         existingReg ? (
                           !isLocked ? (
                             <button
-                              onClick={() => handleEditRegistration(event, existingReg)}
+                              onClick={() => handleStartEdit(event, existingReg)}
                               className="w-full sm:w-auto px-4 py-2 border border-[#353535] hover:border-primary bg-surface hover:bg-surface-high text-white font-anybody font-extrabold uppercase text-xs tracking-wider transition-all sport-skew flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                             >
                               <span className="transform skew-x-8 flex items-center gap-1.5">
@@ -801,7 +655,7 @@ export default function EventsPage() {
                           )
                         ) : (
                           <button
-                            onClick={() => handleSelectEvent(event)}
+                            onClick={() => selectEvent(event, profile?.transponder_number)}
                             className="w-full sm:w-auto px-5 py-2 border-2 border-primary text-primary hover:bg-primary hover:text-black font-anybody font-extrabold uppercase text-xs tracking-wider transition-all sport-skew shadow-[2px_2px_0px_#000] cursor-pointer"
                           >
                             <span className="transform skew-x-8">S'inscrire</span>
@@ -831,7 +685,7 @@ export default function EventsPage() {
             )}
           </div>
 
-          {/* Right: User registrations history */}
+          {/* Historique des engagements du pilote */}
           <div className="premium-card p-6 rounded-lg border border-[#353535] h-fit space-y-4">
             <h3 className="font-anybody font-black text-sm uppercase tracking-wider text-white sport-skew border-b border-[#353535] pb-2">
               Mes Engagements ({registrations.length})
@@ -843,42 +697,47 @@ export default function EventsPage() {
               </div>
             ) : (
               <div className="space-y-3 max-h-75 overflow-y-auto">
-                {registrations.map((reg) => (
-                  <div key={reg.id} className="p-3 bg-surface-dim border border-[#353535]/50 rounded font-mono text-[11px] space-y-1">
-                    <div className="font-bold text-white text-xs font-sans truncate uppercase sport-skew">
-                      {reg.sbc_events?.title || 'Événement'}
-                    </div>
-                    <div className="text-foreground/45 flex justify-between items-start">
-                      <span>Catégories :</span>
-                      <span className="text-primary font-bold text-right ml-2">
-                        {Array.isArray(reg.selected_categories) && reg.selected_categories.length > 0
-                          ? reg.selected_categories.map((c: any) => c.name).join(' + ')
-                          : reg.race_category || 'Non spécifié'}
-                      </span>
-                    </div>
-                    <div className="text-foreground/45 flex justify-between">
-                      <span>Transpondeur :</span>
-                      <span className="text-white">{reg.transponder_id || 'Aucun'}</span>
-                    </div>
-                    {Array.isArray(reg.selected_meals) && reg.selected_meals.length > 0 ? (
-                      <div className="text-foreground/45 flex justify-between">
-                        <span>Repas :</span>
-                        <span className="text-white">
-                          {reg.selected_meals.map((m: any) => `${m.name} x${m.quantity}`).join(', ')}
+                {registrations.map((reg) => {
+                  const selCats = reg.selected_categories as unknown as SelectedCategoryItem[] | null;
+                  const selMeals = reg.selected_meals as unknown as { name: string; quantity: number }[] | null;
+
+                  return (
+                    <div key={reg.id} className="p-3 bg-surface-dim border border-[#353535]/50 rounded font-mono text-[11px] space-y-1">
+                      <div className="font-bold text-white text-xs font-sans truncate uppercase sport-skew">
+                        {reg.sbc_events?.title || 'Événement'}
+                      </div>
+                      <div className="text-foreground/45 flex justify-between items-start">
+                        <span>Catégories :</span>
+                        <span className="text-primary font-bold text-right ml-2">
+                          {Array.isArray(selCats) && selCats.length > 0
+                            ? selCats.map((c) => c.name).join(' + ')
+                            : reg.race_category || 'Non spécifié'}
                         </span>
                       </div>
-                    ) : Array.isArray(reg.food_options) && reg.food_options.length > 0 ? (
                       <div className="text-foreground/45 flex justify-between">
-                        <span>Repas :</span>
-                        <span className="text-white">{reg.food_options.join(', ')}</span>
+                        <span>Transpondeur :</span>
+                        <span className="text-white">{reg.transponder_id || 'Aucun'}</span>
                       </div>
-                    ) : null}
-                    <div className="text-foreground/45 flex justify-between">
-                      <span>Total :</span>
-                      <span className="text-success font-bold">€{parseFloat(reg.total_paid).toFixed(2)}</span>
+                      {Array.isArray(selMeals) && selMeals.length > 0 ? (
+                        <div className="text-foreground/45 flex justify-between">
+                          <span>Repas :</span>
+                          <span className="text-white">
+                            {selMeals.map((m) => `${m.name} x${m.quantity}`).join(', ')}
+                          </span>
+                        </div>
+                      ) : Array.isArray(reg.food_options) && reg.food_options.length > 0 ? (
+                        <div className="text-foreground/45 flex justify-between">
+                          <span>Repas :</span>
+                          <span className="text-white">{reg.food_options.join(', ')}</span>
+                        </div>
+                      ) : null}
+                      <div className="text-foreground/45 flex justify-between">
+                        <span>Total :</span>
+                        <span className="text-success font-bold">€{Number(reg.total_paid || 0).toFixed(2)}</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

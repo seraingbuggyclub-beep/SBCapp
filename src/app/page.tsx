@@ -23,7 +23,7 @@ export default async function LandingPage() {
   if (session?.user) {
     const { data: profileData } = await supabase
       .from('sbc_members')
-      .select('role, permissions, email, payment_status')
+      .select('*')
       .eq('id', session.user.id)
       .single();
     

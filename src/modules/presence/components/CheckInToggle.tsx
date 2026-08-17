@@ -1,18 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { checkInMember, checkOutMember } from '../actions';
-import { MapPin, ToggleLeft, ToggleRight, Radio, Compass, Navigation, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { ToggleLeft, ToggleRight, Radio, Compass, Navigation } from 'lucide-react';
 import { usePresenceZone, SBC_LAT, SBC_LNG, GEOFENCE_RADIUS_METERS, calculateHaversineDistance } from '../contexts/PresenceZoneContext';
+import { PresenceSession, getErrorMessage } from '@/types/models';
 
 interface CheckInToggleProps {
   memberId: string;
-  initialPresence: any;
+  initialPresence: PresenceSession | null;
 }
 
 export default function CheckInToggle({ memberId, initialPresence }: CheckInToggleProps) {
   const presenceContext = usePresenceZone();
-  const [presence, setPresence] = useState<any>(initialPresence);
+  const [presence, setPresence] = useState<PresenceSession | null>(initialPresence);
   const [checkInType, setCheckInType] = useState<'auto' | 'manual'>('auto');
   const [isPublic, setIsPublic] = useState(true);
   
@@ -23,6 +24,15 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [insideGeofence, setInsideGeofence] = useState<boolean | null>(null);
 
+  const isMountedRef = React.useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Haversine formula to compute distance in meters
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     return calculateHaversineDistance(lat1, lon1, lat2, lon2);
@@ -30,23 +40,29 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
 
   // Log status helper
   const logStatus = (msg: string) => {
-    setStatusLog((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 4)]);
+    if (isMountedRef.current) {
+      setStatusLog((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 4)]);
+    }
   };
 
   // Get location and check geofence
-  const verifyLocation = (): Promise<{ lat: number; lng: number; inside: boolean } | null> => {
+  const verifyLocation = useCallback((): Promise<{ lat: number; lng: number; inside: boolean } | null> => {
     return new Promise((resolve) => {
-      if (!navigator.geolocation) {
+      if (typeof window === 'undefined' || !navigator.geolocation) {
         logStatus("La géolocalisation n'est pas supportée par votre navigateur.");
         resolve(null);
         return;
       }
 
-      setGeolocating(true);
+      if (isMountedRef.current) setGeolocating(true);
       logStatus("Recherche des coordonnées GPS...");
 
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          if (!isMountedRef.current) {
+            resolve(null);
+            return;
+          }
           const { latitude, longitude } = position.coords;
           setCoords({ lat: latitude, lng: longitude });
 
@@ -63,29 +79,16 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
           resolve({ lat: latitude, lng: longitude, inside });
         },
         (error) => {
-          setGeolocating(false);
+          if (isMountedRef.current) setGeolocating(false);
           logStatus(`Erreur GPS : ${error.message}`);
           resolve(null);
         },
         { enableHighAccuracy: true, timeout: 10000 }
       );
     });
-  };
+  }, []);
 
-  // Automatic triggers on mount or mode change
-  useEffect(() => {
-    if (checkInType === 'auto' && !presence) {
-      logStatus("Mode Auto activé. Lancement du radar de zone...");
-      verifyLocation().then((loc) => {
-        if (loc?.inside) {
-          logStatus("Validation radar positive. Enregistrement automatique...");
-          handleCheckIn(loc.lat, loc.lng, 'auto');
-        }
-      });
-    }
-  }, [checkInType]);
-
-  const handleCheckIn = async (latitude?: number, longitude?: number, typeOverride?: 'manual' | 'auto') => {
+  const handleCheckIn = useCallback(async (latitude?: number, longitude?: number, typeOverride?: 'manual' | 'auto') => {
     setLoading(true);
     const finalType = typeOverride || checkInType;
     
@@ -101,23 +104,35 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
       if (error) {
         logStatus(`Erreur d'enregistrement : ${error}`);
       } else {
-        setPresence(data);
+        setPresence((data as PresenceSession) || null);
         logStatus(`Présence validée en mode ${finalType === 'auto' ? 'Automatique' : 'Manuel'}.`);
         await presenceContext.refreshPresence();
       }
-    } catch (err: any) {
-      logStatus(`Erreur système : ${err.message}`);
+    } catch (err: unknown) {
+      logStatus(`Erreur système : ${getErrorMessage(err)}`);
     } finally {
       setLoading(false);
     }
-  };
+  }, [checkInType, memberId, isPublic, presenceContext]);
+
+  // Automatic triggers on mount or mode change
+  useEffect(() => {
+    if (checkInType === 'auto' && !presence) {
+      logStatus("Mode Auto activé. Lancement du radar de zone...");
+      verifyLocation().then((loc) => {
+        if (loc?.inside) {
+          logStatus("Validation radar positive. Enregistrement automatique...");
+          handleCheckIn(loc.lat, loc.lng, 'auto');
+        }
+      });
+    }
+  }, [checkInType, presence, verifyLocation, handleCheckIn]);
 
   const triggerManualCheckIn = async () => {
     logStatus("Lancement du check-in manuel...");
     const loc = await verifyLocation();
     
-    // Pour le check-in manuel, on peut toujours le faire si l'utilisateur insiste, ou bloquer s'il n'est pas dans le rayon.
-    // Mettons en place une sécurité : le check-in manuel nécessite aussi d'être dans le rayon par sécurité d'assurance FBA.
+    // Pour le check-in manuel, validation dans le rayon pour la conformité assurance FBA
     if (loc) {
       if (loc.inside) {
         await handleCheckIn(loc.lat, loc.lng, 'manual');
@@ -125,7 +140,7 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
         logStatus("Check-in manuel bloqué : Vous devez être sur place (rayon 150m).");
       }
     } else {
-      // Fallback si pas de GPS mais que l'utilisateur force (ex: problème de capteur)
+      // Fallback si pas de GPS mais que l'utilisateur valide
       logStatus("GPS indisponible. Autorisation exceptionnelle sans coordonnées.");
       await handleCheckIn(undefined, undefined, 'manual');
     }
@@ -148,8 +163,8 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
         logStatus("Check-out effectué. Vous n'êtes plus encodé en piste.");
         await presenceContext.refreshPresence();
       }
-    } catch (err: any) {
-      logStatus(`Erreur système : ${err.message}`);
+    } catch (err: unknown) {
+      logStatus(`Erreur système : ${getErrorMessage(err)}`);
     } finally {
       setLoading(false);
     }

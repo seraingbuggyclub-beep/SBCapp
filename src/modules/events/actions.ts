@@ -2,41 +2,23 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { 
+  ClubEvent, 
+  ClubEventInsert, 
+  ClubEventUpdate, 
+  EventFormData, 
+  EventType, 
+  RaceCategoryItem, 
+  MealOptionItem, 
+  SelectedCategoryItem, 
+  SelectedMealItem,
+  Json
+} from '@/types/models';
 
-export interface RaceCategoryItem {
-  name: string;
-  fee: number;
-  type?: string;
-}
-
-export interface MealOptionItem {
-  name: string;
-  price: number;
-  desc?: string;
-}
-
-export type EventType = 'sbc_race' | 'belgian_championship' | 'holiday' | 'club_meeting';
-
-export interface EventFormData {
-  title: string;
-  description?: string;
-  event_date: string;
-  start_time?: string;
-  end_time?: string;
-  category?: string;
-  location?: string;
-  registration_fee?: number;
-  status: 'open' | 'closed' | 'draft';
-  event_type: EventType;
-  has_registration: boolean;
-  external_link?: string;
-  categories: RaceCategoryItem[];
-  meal_options: MealOptionItem[];
-  max_participants?: number;
-}
+export type { RaceCategoryItem, MealOptionItem, EventType, EventFormData, SelectedCategoryItem, SelectedMealItem };
 
 // 1. Récupérer tous les événements ouverts (public / membres)
-export async function getActiveEvents() {
+export async function getActiveEvents(): Promise<{ data: ClubEvent[]; error: string | null }> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('sbc_events')
@@ -51,13 +33,13 @@ export async function getActiveEvents() {
       .select('*')
       .order('event_date', { ascending: true });
     
-    return { data: fallback.data || [], error: fallback.error?.message || null };
+    return { data: (fallback.data as ClubEvent[]) || [], error: fallback.error?.message || null };
   }
-  return { data: data || [], error: null };
+  return { data: (data as ClubEvent[]) || [], error: null };
 }
 
 // 2. Récupérer tous les événements (Backoffice Admin) avec compteur d'inscriptions
-export async function getAllEventsAdmin() {
+export async function getAllEventsAdmin(): Promise<{ data: (ClubEvent & { registrations_count: number })[]; error: string | null }> {
   const supabase = await createClient();
   const { data: events, error } = await supabase
     .from('sbc_events')
@@ -73,7 +55,7 @@ export async function getAllEventsAdmin() {
     return { data: [], error: error.message };
   }
 
-  const formatted = (events || []).map((ev: any) => ({
+  const formatted = ((events || []) as (ClubEvent & { sbc_event_registrations?: { id: string }[] })[]).map((ev) => ({
     ...ev,
     registrations_count: ev.sbc_event_registrations?.length || 0,
   }));
@@ -82,10 +64,10 @@ export async function getAllEventsAdmin() {
 }
 
 // 3. Créer un nouvel événement (Admin)
-export async function createEventAdmin(formData: EventFormData) {
+export async function createEventAdmin(formData: EventFormData): Promise<{ data: ClubEvent | null; error: string | null }> {
   const supabase = await createClient();
 
-  const payload: any = {
+  const payload: ClubEventInsert = {
     title: formData.title,
     description: formData.description || null,
     event_date: formData.event_date,
@@ -98,8 +80,8 @@ export async function createEventAdmin(formData: EventFormData) {
     event_type: formData.event_type || 'sbc_race',
     has_registration: formData.has_registration ?? true,
     external_link: formData.external_link || null,
-    categories: formData.categories || [],
-    meal_options: formData.meal_options || [],
+    categories: (formData.categories as unknown as Json) || null,
+    meal_options: (formData.meal_options as unknown as Json) || null,
     max_participants: formData.max_participants || null,
   };
 
@@ -116,16 +98,34 @@ export async function createEventAdmin(formData: EventFormData) {
   revalidatePath('/events');
   revalidatePath('/admin/events');
   revalidatePath('/admin');
-  return { data, error: null };
+  return { data: (data as ClubEvent) || null, error: null };
 }
 
 // 4. Mettre à jour un événement existant (Admin)
-export async function updateEventAdmin(eventId: string, formData: Partial<EventFormData>) {
+export async function updateEventAdmin(eventId: string, formData: Partial<EventFormData>): Promise<{ data: ClubEvent | null; error: string | null }> {
   const supabase = await createClient();
+
+  const updatePayload: ClubEventUpdate = {
+    ...(formData.title ? { title: formData.title } : {}),
+    ...(formData.description !== undefined ? { description: formData.description } : {}),
+    ...(formData.event_date ? { event_date: formData.event_date } : {}),
+    ...(formData.start_time ? { start_time: formData.start_time } : {}),
+    ...(formData.end_time ? { end_time: formData.end_time } : {}),
+    ...(formData.category ? { category: formData.category } : {}),
+    ...(formData.location ? { location: formData.location } : {}),
+    ...(formData.registration_fee !== undefined ? { registration_fee: formData.registration_fee } : {}),
+    ...(formData.status ? { status: formData.status } : {}),
+    ...(formData.event_type ? { event_type: formData.event_type } : {}),
+    ...(formData.has_registration !== undefined ? { has_registration: formData.has_registration } : {}),
+    ...(formData.external_link !== undefined ? { external_link: formData.external_link } : {}),
+    ...(formData.categories ? { categories: formData.categories as unknown as Json } : {}),
+    ...(formData.meal_options ? { meal_options: formData.meal_options as unknown as Json } : {}),
+    ...(formData.max_participants !== undefined ? { max_participants: formData.max_participants } : {}),
+  };
 
   const { data, error } = await supabase
     .from('sbc_events')
-    .update(formData as any)
+    .update(updatePayload)
     .eq('id', eventId)
     .select()
     .single();
@@ -137,11 +137,11 @@ export async function updateEventAdmin(eventId: string, formData: Partial<EventF
   revalidatePath('/events');
   revalidatePath('/admin/events');
   revalidatePath('/admin');
-  return { data, error: null };
+  return { data: (data as ClubEvent) || null, error: null };
 }
 
 // 5. Supprimer un événement (Admin)
-export async function deleteEventAdmin(eventId: string) {
+export async function deleteEventAdmin(eventId: string): Promise<{ success: boolean; error: string | null }> {
   const supabase = await createClient();
 
   const { error } = await supabase
@@ -159,18 +159,6 @@ export async function deleteEventAdmin(eventId: string) {
   return { success: true, error: null };
 }
 
-export interface SelectedCategoryItem {
-  name: string;
-  fee: number;
-  type?: string;
-}
-
-export interface SelectedMealItem {
-  name: string;
-  quantity: number;
-  unit_price: number;
-}
-
 // 6. Inscrire un pilote à un événement (avec support des catégories multiples et repas)
 export async function registerForEvent(registration: {
   event_id: string;
@@ -186,7 +174,7 @@ export async function registerForEvent(registration: {
   const activeCategories = registration.selected_categories || [];
   const raceCategoryText = registration.race_category || activeCategories.map((c) => c.name).join(', ');
 
-  const activeMeals = (registration.selected_meals || []).filter((m) => m.quantity > 0);
+  const activeMeals = (registration.selected_meals || []).filter((m) => (m.quantity || 0) > 0);
   const food_options_text = activeMeals.map((m) => `${m.name} x${m.quantity}`);
 
   let { data, error } = await supabase
@@ -196,8 +184,8 @@ export async function registerForEvent(registration: {
       member_id: registration.member_id,
       race_category: raceCategoryText,
       food_options: food_options_text,
-      selected_meals: activeMeals as any,
-      selected_categories: activeCategories as any,
+      selected_meals: activeMeals as unknown as Json,
+      selected_categories: activeCategories as unknown as Json,
       transponder_id: registration.transponder_id || null,
       total_paid: registration.total_paid,
     })
@@ -269,7 +257,7 @@ export async function updateEventRegistration(registrationId: string, payload: {
   }
 
   // 3. Vérification de la règle des 48h
-  const eventInfo: any = existingReg.sbc_events;
+  const eventInfo = existingReg.sbc_events as unknown as { id: string; event_date: string; start_time?: string } | null;
   if (eventInfo?.event_date) {
     const eventDateStr = eventInfo.event_date;
     const startTimeStr = eventInfo.start_time || '09:00:00';
@@ -292,7 +280,7 @@ export async function updateEventRegistration(registrationId: string, payload: {
   const activeCategories = payload.selected_categories || [];
   const raceCategoryText = payload.race_category || activeCategories.map((c) => c.name).join(', ');
 
-  const activeMeals = (payload.selected_meals || []).filter((m) => m.quantity > 0);
+  const activeMeals = (payload.selected_meals || []).filter((m) => (m.quantity || 0) > 0);
   const food_options_text = activeMeals.map((m) => `${m.name} x${m.quantity}`);
 
   let { data, error } = await supabase
@@ -300,8 +288,8 @@ export async function updateEventRegistration(registrationId: string, payload: {
     .update({
       race_category: raceCategoryText,
       food_options: food_options_text,
-      selected_meals: activeMeals as any,
-      selected_categories: activeCategories as any,
+      selected_meals: activeMeals as unknown as Json,
+      selected_categories: activeCategories as unknown as Json,
       transponder_id: payload.transponder_id || null,
       total_paid: payload.total_paid,
     })
@@ -370,7 +358,7 @@ export async function getMemberRegistrations(memberId: string) {
   return { data: data || [], error: null };
 }
 
-// 8. Récupérer la liste des inscrits pour un événement donné (Admin)
+// 9. Récupérer la liste des inscrits pour un événement donné (Admin)
 export async function getEventRegistrationsAdmin(eventId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase

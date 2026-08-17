@@ -2,8 +2,9 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { MemberProfile, MemberProfileCreateInput, MemberProfileUpdateInput, MemberUpdate } from '@/types/models';
 
-export async function getMemberProfile(userId: string) {
+export async function getMemberProfile(userId: string): Promise<{ data: MemberProfile | null; error: string | null }> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('sbc_members')
@@ -14,25 +15,10 @@ export async function getMemberProfile(userId: string) {
   if (error) {
     return { data: null, error: error.message };
   }
-  return { data, error: null };
+  return { data: (data as MemberProfile) || null, error: null };
 }
 
-export async function createMemberProfile(profile: {
-  id: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  phone?: string;
-  license_number?: string;
-  street_number?: string;
-  zip_code?: string;
-  city?: string;
-  birth_date?: string;
-  membership_choice?: string;
-  transponder_number?: string;
-  roi_accepted?: boolean;
-  insurance_ack?: boolean;
-}) {
+export async function createMemberProfile(profile: MemberProfileCreateInput): Promise<{ data: MemberProfile | null; error: string | null }> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('sbc_members')
@@ -62,26 +48,12 @@ export async function createMemberProfile(profile: {
   }
   
   revalidatePath('/dashboard');
-  return { data, error: null };
+  return { data: (data as MemberProfile) || null, error: null };
 }
 
-export async function updateMemberProfile(profile: {
-  id: string;
-  first_name: string;
-  last_name: string;
-  phone?: string;
-  license_number?: string;
-  street_number?: string;
-  zip_code?: string;
-  city?: string;
-  birth_date?: string;
-  membership_choice?: string;
-  transponder_number?: string;
-  roi_accepted?: boolean;
-  insurance_ack?: boolean;
-}) {
+export async function updateMemberProfile(profile: MemberProfileUpdateInput): Promise<{ data: MemberProfile | null; error: string | null }> {
   const supabase = await createClient();
-  const updateData: any = {
+  const updateData: MemberUpdate = {
     first_name: profile.first_name,
     last_name: profile.last_name,
     phone: profile.phone || null,
@@ -108,9 +80,25 @@ export async function updateMemberProfile(profile: {
     .single();
 
   if (error) {
+    // Si la colonne insurance_ack n'a pas encore été ajoutée dans Supabase, repli gracieux
+    if (error.message.includes('insurance_ack') && updateData.insurance_ack !== undefined) {
+      delete updateData.insurance_ack;
+      const { data: retryData, error: retryError } = await supabase
+        .from('sbc_members')
+        .update(updateData)
+        .eq('id', profile.id)
+        .select()
+        .single();
+
+      if (retryError) {
+        return { data: null, error: retryError.message };
+      }
+      revalidatePath('/dashboard');
+      return { data: (retryData as MemberProfile) || null, error: null };
+    }
     return { data: null, error: error.message };
   }
 
   revalidatePath('/dashboard');
-  return { data, error: null };
+  return { data: (data as MemberProfile) || null, error: null };
 }

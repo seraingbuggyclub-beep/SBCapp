@@ -1,3 +1,5 @@
+import { ModulePermissionsMap, UserRole } from '@/types/models';
+
 /**
  * Vérifie si l'adresse e-mail correspond au Super-Administrateur de SBC (Stéphane).
  */
@@ -15,8 +17,8 @@ export function isSuperAdmin(email: string | undefined | null): boolean {
  * @param email L'adresse e-mail (pour le bypass Super-Admin)
  */
 export function hasPermission(
-  role: string | undefined | null,
-  permissions: any,
+  role: UserRole | string | undefined | null,
+  permissions: ModulePermissionsMap | null | undefined,
   moduleId: string,
   actionId: string,
   email?: string | null
@@ -46,8 +48,8 @@ export function hasPermission(
   }
 
   // Et sous forme de records: { config: { view: true, edit: true } }
-  if (typeof modulePermissions === 'object') {
-    return !!modulePermissions[actionId];
+  if (typeof modulePermissions === 'object' && modulePermissions !== null) {
+    return !!(modulePermissions as Record<string, boolean>)[actionId];
   }
 
   return false;

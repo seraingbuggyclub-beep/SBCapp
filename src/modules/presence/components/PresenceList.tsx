@@ -1,13 +1,16 @@
 import React from 'react';
-import { UserCheck, Radio, Clock, EyeOff } from 'lucide-react';
+import { UserCheck, Radio, Clock } from 'lucide-react';
+import { PublicPresenceItem } from '@/types/models';
 
 interface PresenceListProps {
-  presences: any[];
+  presences: PublicPresenceItem[];
 }
 
 export default function PresenceList({ presences }: PresenceListProps) {
-  const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  const getInitials = (firstName?: string, lastName?: string) => {
+    const fn = firstName ? firstName.charAt(0) : '';
+    const ln = lastName ? lastName.charAt(0) : '';
+    return `${fn}${ln}`.toUpperCase() || 'SB';
   };
 
   return (
@@ -50,15 +53,15 @@ export default function PresenceList({ presences }: PresenceListProps) {
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded bg-background border border-primary/20 flex items-center justify-center text-primary font-anybody font-extrabold text-xs sport-skew shadow-[1px_1px_0px_#000]">
                     <span className="transform skew-x-8">
-                      {getInitials(member.first_name, member.last_name)}
+                      {getInitials(member?.first_name, member?.last_name)}
                     </span>
                   </div>
                   <div>
                     <h4 className="text-sm font-semibold text-white">
-                      {member.first_name} {member.last_name}
+                      {member?.first_name || 'Pilote'} {member?.last_name || 'SBC'}
                     </h4>
                     <p className="text-[10px] text-foreground/45 font-mono">
-                      {member.license_number || 'Pas de licence FBA'}
+                      {member?.license_number || 'Pas de licence FBA'}
                     </p>
                   </div>
                 </div>

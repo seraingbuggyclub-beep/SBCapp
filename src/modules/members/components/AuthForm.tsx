@@ -71,7 +71,7 @@ export default function AuthForm() {
         }
 
         // Préparation des métadonnées utilisateur
-        const metaData: any = {
+        const metaData: Record<string, string | boolean | null> = {
           first_name: firstName,
           last_name: lastName,
           registration_type: regType,
@@ -134,8 +134,12 @@ export default function AuthForm() {
         router.push('/dashboard');
         router.refresh();
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "Une erreur est survenue lors de l'authentification.");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setErrorMsg(err.message);
+      } else {
+        setErrorMsg("Une erreur est survenue lors de l'authentification.");
+      }
     } finally {
       setLoading(false);
     }

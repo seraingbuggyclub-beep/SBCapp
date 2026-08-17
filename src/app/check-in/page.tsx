@@ -1,59 +1,47 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { getMemberProfile } from '@/modules/members/actions';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 import { getMemberActivePresence } from '@/modules/presence/actions';
 import CheckInToggle from '@/modules/presence/components/CheckInToggle';
 import CadenasLock from '@/modules/payments/components/CadenasLock';
 import FbaDisclaimer from '@/modules/presence/components/FbaDisclaimer';
-import { KeyRound, ShieldAlert, Radio } from 'lucide-react';
+import { KeyRound } from 'lucide-react';
 import Link from 'next/link';
+import { PresenceSession } from '@/types/models';
 
 export default function CheckInPage() {
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [activePresence, setActivePresence] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const supabase = createClient();
-
-  const loadData = async () => {
-    setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (session?.user) {
-      setUser(session.user);
-      
-      // Fetch member profile details
-      const { data: profileData } = await getMemberProfile(session.user.id);
-      setProfile(profileData);
-
-      if (profileData && profileData.payment_status === 'paid') {
-        // Fetch active presence for check-in toggle
-        const { data: presenceData } = await getMemberActivePresence(session.user.id);
-        setActivePresence(presenceData);
-      }
-    } else {
-      setUser(null);
-      setProfile(null);
-      setActivePresence(null);
-    }
-    setLoading(false);
-  };
+  const { user, profile, loading: authLoading, refresh: refreshAuth } = useAuth();
+  const [activePresence, setActivePresence] = useState<PresenceSession | null>(null);
+  const [presenceLoading, setPresenceLoading] = useState(true);
 
   useEffect(() => {
-    loadData();
+    let isMounted = true;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      loadData();
-    });
+    async function fetchPresence() {
+      if (user && profile?.payment_status === 'paid') {
+        setPresenceLoading(true);
+        const { data } = await getMemberActivePresence(user.id);
+        if (isMounted) {
+          setActivePresence((data as PresenceSession) || null);
+          setPresenceLoading(false);
+        }
+      } else {
+        if (isMounted) {
+          setActivePresence(null);
+          setPresenceLoading(false);
+        }
+      }
+    }
+
+    fetchPresence();
 
     return () => {
-      subscription.unsubscribe();
+      isMounted = false;
     };
-  }, []);
+  }, [user, profile?.payment_status]);
 
-  if (loading) {
+  if (authLoading || (user && profile?.payment_status === 'paid' && presenceLoading)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-100 gap-2 font-mono text-xs">
         <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
@@ -89,11 +77,55 @@ export default function CheckInPage() {
     );
   }
 
+  // Engagements ROI / Assurance non acceptés -> Blocage strict
+  const hasAgreements = Boolean(profile?.roi_accepted && profile?.insurance_ack);
+  if (user && !hasAgreements) {
+    return (
+      <div className="max-w-md mx-auto py-10 space-y-6 text-center">
+        <div className="premium-card p-6 md:p-8 rounded-lg border-2 border-secondary bg-secondary/10 shadow-[0_0_30px_rgba(255,50,0,0.2)]">
+          <div className="w-12 h-12 rounded-full bg-secondary/20 flex items-center justify-center mx-auto mb-4 border border-secondary text-secondary">
+            <KeyRound className="w-6 h-6" />
+          </div>
+          <h3 className="font-anybody font-black text-lg uppercase tracking-tight sport-skew text-white mb-2">
+            Engagements Obligatoires Requis
+          </h3>
+          <p className="text-xs text-foreground/80 leading-relaxed mb-6 font-mono">
+            Pour être couvert par l'assurance FBA et activer le radar de présence, vous devez obligatoirement accepter le <strong>Règlement d'Ordre Intérieur (ROI)</strong> et les <strong>conditions d'assurance FBA</strong> sur votre profil.
+          </p>
+          <Link
+            href="/dashboard#engagements-section"
+            className="premium-btn text-xs w-full flex items-center justify-center"
+          >
+            <span className="transform skew-x-8">Valider mes engagements sur le Dashboard</span>
+          </Link>
+        </div>
+
+        <FbaDisclaimer />
+      </div>
+    );
+  }
+
   // Cotisation pas en règle
   if (profile && profile.payment_status !== 'paid') {
     return (
-      <div className="max-w-md mx-auto py-10 space-y-6">
-        <CadenasLock userId={user.id} onUnlocked={loadData} />
+      <div className="max-w-md mx-auto py-10 space-y-6 text-center">
+        <div className="premium-card p-6 md:p-8 rounded-lg border border-[#353535]">
+          <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center mx-auto mb-4 border border-[#353535] text-secondary">
+            <KeyRound className="w-6 h-6" />
+          </div>
+          <h3 className="font-anybody font-black text-lg uppercase tracking-tight sport-skew text-white mb-2">
+            Cotisation Non Acquittée
+          </h3>
+          <p className="text-xs text-foreground/60 leading-relaxed mb-6 font-mono">
+            Votre cotisation annuelle est actuellement en attente ou expirée. Veuillez régulariser votre cotisation auprès du club pour accéder au check-in piste.
+          </p>
+          <Link
+            href="/dashboard"
+            className="premium-btn text-xs w-full flex items-center justify-center"
+          >
+            <span className="transform skew-x-8">Accéder à mon Espace Pilote</span>
+          </Link>
+        </div>
         <FbaDisclaimer />
       </div>
     );

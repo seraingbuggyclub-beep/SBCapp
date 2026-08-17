@@ -3,9 +3,10 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { isSuperAdmin, hasPermission } from './permissions';
+import { MemberProfile, ClubConfig, UserRole, PaymentStatus, ModulePermissionsMap } from '@/types/models';
 
 // Récupérer la liste des membres (sécurisée)
-export async function getMembersList() {
+export async function getMembersList(): Promise<{ data: MemberProfile[]; error: string | null }> {
   const supabase = await createClient();
   
   // Vérification de la session utilisateur
@@ -29,7 +30,7 @@ export async function getMembersList() {
   const isAdmin = callerProfile.role === 'admin';
   const hasViewAccess = hasPermission(
     callerProfile.role,
-    callerProfile.permissions,
+    callerProfile.permissions as ModulePermissionsMap,
     'members',
     'view',
     callerProfile.email
@@ -48,14 +49,14 @@ export async function getMembersList() {
   if (error) {
     return { data: [], error: error.message };
   }
-  return { data, error: null };
+  return { data: (data as MemberProfile[]) || [], error: null };
 }
 
 // Mettre à jour le statut de paiement d'un membre (sécurisée)
 export async function updatePaymentStatus(
   memberId: string,
-  status: 'pending' | 'paid' | 'expired'
-) {
+  status: PaymentStatus
+): Promise<{ data: MemberProfile | null; error: string | null }> {
   const supabase = await createClient();
   
   const { data: { user } } = await supabase.auth.getUser();
@@ -72,7 +73,7 @@ export async function updatePaymentStatus(
 
   const isAuthorized = hasPermission(
     callerProfile?.role,
-    callerProfile?.permissions,
+    callerProfile?.permissions as ModulePermissionsMap,
     'members',
     'edit',
     callerProfile?.email
@@ -97,11 +98,11 @@ export async function updatePaymentStatus(
   revalidatePath('/admin');
   revalidatePath('/dashboard');
   revalidatePath('/check-in');
-  return { data, error: null };
+  return { data: (data as MemberProfile) || null, error: null };
 }
 
 // Récupérer la configuration du club (notamment le code cadenas) (sécurisée)
-export async function getClubConfig() {
+export async function getClubConfig(): Promise<{ data: ClubConfig | null; error: string | null }> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -118,7 +119,7 @@ export async function getClubConfig() {
 
   const isAuthorized = hasPermission(
     callerProfile?.role,
-    callerProfile?.permissions,
+    callerProfile?.permissions as ModulePermissionsMap,
     'config',
     'view',
     callerProfile?.email
@@ -137,11 +138,11 @@ export async function getClubConfig() {
   if (error) {
     return { data: null, error: error.message };
   }
-  return { data, error: null };
+  return { data: (data as ClubConfig) || null, error: null };
 }
 
 // Mettre à jour le code cadenas du club (sécurisée)
-export async function updateLockCode(newCode: string) {
+export async function updateLockCode(newCode: string): Promise<{ success: boolean; error: string | null }> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -158,7 +159,7 @@ export async function updateLockCode(newCode: string) {
 
   const isAuthorized = hasPermission(
     callerProfile?.role,
-    callerProfile?.permissions,
+    callerProfile?.permissions as ModulePermissionsMap,
     'config',
     'edit',
     callerProfile?.email
@@ -198,9 +199,9 @@ export async function updateLockCode(newCode: string) {
 // Mettre à jour le rôle et les permissions d'un membre (RÉSERVÉ AU SUPER-ADMIN)
 export async function updateMemberRoleAndPermissions(
   memberId: string,
-  role: 'visitor' | 'member' | 'daily_member' | 'admin',
-  permissions: Record<string, string[]>
-) {
+  role: UserRole,
+  permissions: ModulePermissionsMap
+): Promise<{ success: boolean; error: string | null }> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();

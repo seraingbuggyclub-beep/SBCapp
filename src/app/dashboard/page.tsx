@@ -1,427 +1,874 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { getMemberProfile, updateMemberProfile } from '@/modules/members/actions';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { updateMemberProfile } from '@/modules/members/actions';
 import { getMemberRegistrations, getActiveEvents } from '@/modules/events/actions';
+import { getMemberClubLockCode } from '@/modules/payments/actions';
 import AuthForm from '@/modules/members/components/AuthForm';
-import CadenasLock from '@/modules/payments/components/CadenasLock';
-import FbaDisclaimer from '@/modules/presence/components/FbaDisclaimer';
-import { User, Phone, FileText, CheckCircle2, Award, Calendar, Clock, MapPin, Trophy, ShieldCheck, Lock, ChevronRight } from 'lucide-react';
+import {
+  User,
+  CheckCircle2,
+  AlertTriangle,
+  Calendar,
+  Clock,
+  MapPin,
+  Trophy,
+  ShieldCheck,
+  Hash,
+  Phone,
+  Save,
+  Radio,
+  FileText,
+  Shield,
+  ArrowRight,
+  Lock,
+  Unlock,
+  KeyRound,
+  Sliders,
+  Sparkles,
+  BookOpen,
+  Award,
+  X,
+  ExternalLink,
+  ChevronRight,
+} from 'lucide-react';
 import Link from 'next/link';
+import { ClubEvent, getErrorMessage, MemberProfileUpdateInput } from '@/types/models';
+
+interface MemberRegistrationItem {
+  id: string;
+  race_category: string;
+  total_paid: number;
+  sbc_events: {
+    title: string;
+    location: string;
+    event_date: string;
+  };
+}
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [registrations, setRegistrations] = useState<any[]>([]);
-  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  // Profile editing state
-  const [isEditing, setIsEditing] = useState(false);
+  const { user, profile, loading: authLoading, refresh: refreshAuth } = useAuth();
+  const [registrations, setRegistrations] = useState<MemberRegistrationItem[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<ClubEvent[]>([]);
+  const [lockCode, setLockCode] = useState<string | null>(null);
+  const [dataLoading, setDataLoading] = useState(false);
+
+  // Form State pour l'édition complète du profil
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [licenseNumber, setLicenseNumber] = useState('');
-  const [updateError, setUpdateError] = useState('');
-  const [updateSuccess, setUpdateSuccess] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [streetNumber, setStreetNumber] = useState('');
+  const [zipCode, setZipCode] = useState('');
+  const [city, setCity] = useState('');
+  const [transponderNumber, setTransponderNumber] = useState('');
+  const [roiAccepted, setRoiAccepted] = useState(false);
+  const [insuranceAck, setInsuranceAck] = useState(false);
 
-  const supabase = createClient();
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileMsg, setProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const loadDashboardData = async () => {
-    setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (session?.user) {
-      setUser(session.user);
-      
-      // Fetch member profile details
-      const { data: profileData } = await getMemberProfile(session.user.id);
-      setProfile(profileData);
+  // Modale de lecture des documents officiels (ROI / Charte)
+  const [activeDocModal, setActiveDocModal] = useState<'roi' | 'charte' | null>(null);
 
-      if (profileData && profileData.payment_status === 'paid') {
-        // Fetch active registrations
-        const { data: regsData } = await getMemberRegistrations(session.user.id);
-        setRegistrations(regsData || []);
-
-        // Fetch active upcoming events
-        const { data: eventsData } = await getActiveEvents();
-        // Exclude events they are already registered for
-        const registeredEventIds = (regsData || []).map((r: any) => r.sbc_events.id);
-        const filteredEvents = (eventsData || []).filter(
-          (e: any) => !registeredEventIds.includes(e.id)
-        );
-        setUpcomingEvents(filteredEvents);
-      }
-    } else {
-      setUser(null);
-      setProfile(null);
-      setRegistrations([]);
-      setUpcomingEvents([]);
-    }
-    setLoading(false);
-  };
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
-    loadDashboardData();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      loadDashboardData();
-    });
-
+    isMountedRef.current = true;
     return () => {
-      subscription.unsubscribe();
+      isMountedRef.current = false;
     };
   }, []);
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
+  // Synchronisation des champs lors du chargement du profil
+  useEffect(() => {
+    if (profile) {
+      setFirstName(profile.first_name || '');
+      setLastName(profile.last_name || '');
+      setPhone(profile.phone || '');
+      setLicenseNumber(profile.license_number || '');
+      setBirthDate(profile.birth_date || '');
+      setStreetNumber(profile.street_number || '');
+      setZipCode(profile.zip_code || '');
+      setCity(profile.city || '');
+      setTransponderNumber(profile.transponder_number || '');
+      setRoiAccepted(Boolean(profile.roi_accepted));
+      setInsuranceAck(Boolean(profile.insurance_ack));
+    }
+  }, [profile]);
+
+  const loadMemberData = useCallback(async (userId: string) => {
+    setDataLoading(true);
+    try {
+      // 1. Inscriptions actives du pilote
+      const { data: regsData } = await getMemberRegistrations(userId);
+      if (isMountedRef.current) {
+        setRegistrations((regsData || []) as unknown as MemberRegistrationItem[]);
+      }
+
+      // 2. Événements futurs disponibles
+      const { data: eventsData } = await getActiveEvents();
+      if (isMountedRef.current) {
+        const regs = (regsData || []) as unknown as Array<{ event_id: string }>;
+        const registeredEventIds = regs.map((r) => r.event_id);
+        const filteredEvents = (eventsData || []).filter((e) => !registeredEventIds.includes(e.id));
+        setUpcomingEvents(filteredEvents);
+      }
+
+      // 3. Récupération du code cadenas club si cotisant
+      const { lockCode: code } = await getMemberClubLockCode();
+      if (isMountedRef.current) {
+        setLockCode(code);
+      }
+    } catch (err: unknown) {
+      console.error('Erreur chargement dashboard:', getErrorMessage(err));
+    } finally {
+      if (isMountedRef.current) {
+        setDataLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user && profile?.payment_status === 'paid') {
+      loadMemberData(user.id);
+    } else {
+      setRegistrations([]);
+      setUpcomingEvents([]);
+      setLockCode(null);
+    }
+  }, [user, profile?.payment_status, loadMemberData]);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    setUpdateError('');
-    setUpdateSuccess('');
+    setSavingProfile(true);
+    setProfileMsg(null);
 
-    const { data, error } = await updateMemberProfile({
-      id: user.id,
-      first_name: firstName,
-      last_name: lastName,
-      phone,
-      license_number: licenseNumber,
-    });
+    try {
+      if (!firstName.trim() || !lastName.trim()) {
+        throw new Error('Le prénom et le nom sont requis.');
+      }
+      if (!phone.trim()) {
+        throw new Error('Le numéro de téléphone est obligatoire.');
+      }
+      if (!roiAccepted) {
+        throw new Error("Vous devez accepter le Règlement d'Ordre Intérieur (ROI).");
+      }
 
-    if (error) {
-      setUpdateError(error);
-    } else {
-      setProfile(data);
-      setUpdateSuccess('Profil mis à jour !');
-      setIsEditing(false);
+      const payload: MemberProfileUpdateInput = {
+        id: user.id,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        phone: phone.trim(),
+        license_number: licenseNumber.trim() || null,
+        birth_date: birthDate || null,
+        street_number: streetNumber.trim() || null,
+        zip_code: zipCode.trim() || null,
+        city: city.trim() || null,
+        transponder_number: transponderNumber.trim() || null,
+        roi_accepted: roiAccepted,
+        insurance_ack: insuranceAck,
+      };
+
+      const { error } = await updateMemberProfile(payload);
+      if (error) throw new Error(error);
+
+      await refreshAuth();
+      if (isMountedRef.current) {
+        setProfileMsg({ type: 'success', text: 'Profil et paramètres piste enregistrés avec succès !' });
+        setTimeout(() => {
+          if (isMountedRef.current) setProfileMsg(null);
+        }, 4000);
+      }
+    } catch (err: unknown) {
+      if (isMountedRef.current) {
+        setProfileMsg({ type: 'error', text: getErrorMessage(err) });
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setSavingProfile(false);
+      }
     }
   };
 
-  if (loading) {
+  if (authLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-100 gap-2 font-mono text-xs">
+      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3 font-mono text-xs text-foreground/50">
         <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-        <span>Chargement de votre cockpit pilote...</span>
+        <span>Initialisation de votre cockpit pilote...</span>
       </div>
     );
   }
 
-  // Not Authenticated -> Show Auth Form
+  // Non connecté -> Affichage du Formulaire Auth
   if (!user) {
     return (
-      <div className="max-w-md mx-auto py-16">
+      <div className="max-w-md mx-auto py-12 px-4 space-y-6">
+        <div className="text-center space-y-2 mb-4">
+          <h1 className="font-anybody font-black text-3xl uppercase tracking-tight sport-skew text-white">
+            Cockpit <span className="text-primary">Pilote</span>
+          </h1>
+          <p className="text-xs font-mono text-foreground/50">
+            Connectez-vous pour accéder à votre licence FBA, vos inscriptions et vos paramètres piste.
+          </p>
+        </div>
         <AuthForm />
       </div>
     );
   }
 
-  // Authenticated but Payment pending -> Show Lock Code screen
-  if (profile && profile.payment_status !== 'paid') {
-    return (
-      <div className="max-w-md mx-auto py-16 space-y-6">
-        <FbaDisclaimer />
-        <CadenasLock userId={user.id} onUnlocked={loadDashboardData} />
-      </div>
-    );
-  }
+  const isPaid = profile?.payment_status === 'paid';
+  const hasAgreements = Boolean(profile?.roi_accepted && profile?.insurance_ack);
 
   return (
-    <div className="w-full min-h-screen bg-background relative flex flex-col pb-16">
-      {/* Background Carbon Overlay */}
-      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-[0.02] pointer-events-none z-0" />
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8 animate-fade-in">
+      {/* Bannière de blocage si engagements non acceptés */}
+      {!hasAgreements && (
+        <div className="p-4 md:p-5 rounded-lg border-2 border-secondary bg-secondary/15 text-white font-mono text-xs flex items-start sm:items-center justify-between gap-3 shadow-[0_0_30px_rgba(255,50,0,0.2)] animate-pulse">
+          <div className="flex items-start sm:items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-secondary shrink-0 mt-0.5 sm:mt-0" />
+            <div>
+              <strong className="text-secondary font-bold block text-sm font-sans uppercase">
+                Accès Piste & Courses Verrouillé
+              </strong>
+              <span className="text-foreground/90 text-xs">
+                Vous devez obligatoirement valider le <strong>Règlement d'Ordre Intérieur (ROI)</strong> et l'<strong>Assurance FBA</strong> ci-dessous pour débloquer votre accès au terrain et aux inscriptions.
+              </span>
+            </div>
+          </div>
+          <a
+            href="#engagements-section"
+            className="px-3 py-1.5 rounded bg-secondary hover:bg-secondary/80 text-white font-bold text-[11px] shrink-0 uppercase tracking-wider transition-colors"
+          >
+            Valider
+          </a>
+        </div>
+      )}
 
-      {/* Main content grid in a centered container */}
-      <div className="w-full max-w-6xl mx-auto px-6 py-12 space-y-8 relative z-10">
-        {/* FBA Insurance dynamic alert */}
-        <FbaDisclaimer />
-
-        {/* Simple Dashboard Welcome Banner */}
-        <div className="premium-card p-6 md:p-8 rounded-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-[#353535]">
-          <div className="space-y-1.5">
-            <span className="inline-block bg-primary/10 border border-primary/20 text-primary font-mono text-[9px] px-2.5 py-0.5 uppercase tracking-wider rounded">
-              Cockpit Pilote SBC
+      {/* 1. Header Cockpit Pilote avec Boutons d'Action Rapide */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-[#353535] pb-6">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <div className={`w-3 h-3 rounded-full ${hasAgreements ? 'bg-primary' : 'bg-secondary'} animate-pulse`} />
+            <h1 className="font-anybody font-black text-2xl sm:text-3xl uppercase tracking-tight sport-skew text-white">
+              Cockpit Pilote : <span className="text-primary">{profile?.first_name} {profile?.last_name}</span>
+            </h1>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-foreground/50 mt-1">
+            <span>{user.email}</span>
+            <span>•</span>
+            <span>Licence FBA : <strong className="text-white">{profile?.license_number || 'Non renseignée'}</strong></span>
+            <span>•</span>
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border ${
+                isPaid
+                  ? 'bg-success/15 text-success border-success/30'
+                  : profile?.payment_status === 'expired'
+                  ? 'bg-secondary/15 text-secondary border-secondary/30'
+                  : 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30'
+              }`}
+            >
+              <ShieldCheck className="w-3 h-3" />
+              <span>{isPaid ? 'Cotisation en ordre' : profile?.payment_status === 'expired' ? 'Cotisation expirée' : 'Cotisation en attente'}</span>
             </span>
-            <h2 className="font-anybody font-black text-xl uppercase tracking-tight sport-skew text-white">
-              Pilote : <span className="text-primary">{profile?.first_name} {profile?.last_name}</span>
-            </h2>
-            <p className="text-xs text-foreground/55 font-mono">
-              Licence FBA : {profile?.license_number || 'Non renseignée'} • Statut : Adhérent SBC
+          </div>
+        </div>
+
+        {/* Boutons d'actions rapides */}
+        <div className="flex flex-wrap items-center gap-3">
+          {hasAgreements ? (
+            <>
+              <Link
+                href="/events"
+                className="premium-btn text-xs px-5 py-2.5 flex items-center gap-2 shadow-[0_0_20px_rgba(255,110,0,0.25)] cursor-pointer"
+              >
+                <Trophy className="w-4 h-4" />
+                <span className="transform skew-x-8">S'inscrire à une course</span>
+              </Link>
+
+              <Link
+                href="/check-in"
+                className="px-5 py-2.5 rounded bg-surface hover:bg-surface-high border border-[#353535] hover:border-primary text-xs font-anybody font-bold uppercase tracking-wider text-white flex items-center gap-2 transition-all cursor-pointer sport-skew"
+              >
+                <MapPin className="w-4 h-4 text-primary" />
+                <span className="transform skew-x-8">Prendre la piste / Check-in</span>
+              </Link>
+            </>
+          ) : (
+            <div className="p-2.5 rounded bg-secondary/10 border border-secondary/30 text-secondary text-xs font-mono flex items-center gap-2">
+              <Lock className="w-4 h-4" />
+              <span>Actions bloquées (Engagements requis)</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 2. Grille des Widgets Clés (Cadenas, Assurance FBA, Setups Teaser) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Widget Cadenas d'accès (Compact & Direct) */}
+        <div className="premium-card p-5 rounded-lg border border-[#353535] flex flex-col justify-between space-y-3 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {isPaid ? (
+                <Unlock className="w-5 h-5 text-success" />
+              ) : (
+                <Lock className="w-5 h-5 text-secondary" />
+              )}
+              <h3 className="font-anybody font-black text-sm uppercase sport-skew text-white">
+                Cadenas Club
+              </h3>
+            </div>
+            <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider border ${
+              isPaid ? 'bg-success/15 border-success/30 text-success' : 'bg-secondary/15 border-secondary/30 text-secondary'
+            }`}>
+              {isPaid ? 'Accès Ouvert' : 'Verrouillé'}
+            </span>
+          </div>
+
+          <div className="py-1">
+            {isPaid ? (
+              <div>
+                <span className="text-[10px] font-mono text-foreground/45 uppercase tracking-wider block mb-1">
+                  Combinaison Active
+                </span>
+                <div className="text-3xl font-mono font-bold tracking-widest text-primary bg-background/80 px-3 py-1.5 rounded border border-primary/30 inline-block">
+                  {lockCode || '4000'}
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs font-mono text-foreground/60 leading-relaxed">
+                Le code d'accès au portail et aux stands est réservé aux membres en ordre de cotisation.
+              </p>
+            )}
+          </div>
+
+          <div className="text-[10px] font-mono text-foreground/40 border-t border-[#353535]/40 pt-2 flex items-center gap-1">
+            <span>{isPaid ? '⚠️ Reverrouiller le cadenas après départ' : 'Cotisation annuelle requise'}</span>
+          </div>
+        </div>
+
+        {/* Widget Assurance FBA */}
+        <div className="premium-card p-5 rounded-lg border border-[#353535] flex flex-col justify-between space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-primary" />
+              <h3 className="font-anybody font-black text-sm uppercase sport-skew text-white">
+                Assurance FBA
+              </h3>
+            </div>
+            <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider bg-primary/15 border border-primary/30 text-primary">
+              Fédération FBA
+            </span>
+          </div>
+
+          <div className="space-y-1">
+            <div className="text-xs font-mono text-white font-bold">
+              Couverture RC Piste & Entraînements
+            </div>
+            <p className="text-[11px] font-mono text-foreground/60 leading-relaxed">
+              Assurance active lors de toute présence sur la piste de Seraing.
             </p>
           </div>
 
-          <div className="flex gap-3">
-            <Link
-              href="/events"
-              className="px-4 py-2 bg-primary text-black font-anybody font-black uppercase text-[10px] tracking-wider border border-black hover:bg-secondary hover:text-white transition-all sport-skew flex items-center gap-1.5 shadow-[2px_2px_0px_#000] cursor-pointer"
-            >
-              <span className="transform skew-x-8">S'inscrire à une course</span>
-            </Link>
-            <Link
-              href="/check-in"
-              className="px-4 py-2 bg-surface border border-[#353535] hover:border-primary text-white font-anybody font-black uppercase text-[10px] tracking-wider transition-all sport-skew flex items-center gap-1.5 shadow-[2px_2px_0px_#000] cursor-pointer"
-            >
-              <span className="transform skew-x-8">Prendre la piste</span>
-            </Link>
+          <div className="text-[10px] font-mono text-primary/80 border-t border-[#353535]/40 pt-2 flex items-center gap-1">
+            <MapPin className="w-3 h-3 shrink-0" />
+            <span>Validation GPS requise via Check-in</span>
           </div>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
-          {/* Left Column (Wallet & Profile Info) */}
-          <div className="lg:col-span-4 space-y-6">
-            {/* Status Widget */}
-            <div className="premium-card p-6 rounded-lg border border-[#353535] space-y-4">
-              <h3 className="font-anybody font-black text-xs uppercase tracking-wider text-white sport-skew border-b border-[#353535] pb-2 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-primary" />
-                Statut Assurance FBA
+
+        {/* Widget Réglages Voitures (Teaser) */}
+        <div className="premium-card p-5 rounded-lg border border-[#353535] flex flex-col justify-between space-y-3 bg-gradient-to-br from-surface to-surface-dim/40 relative">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sliders className="w-5 h-5 text-primary" />
+              <h3 className="font-anybody font-black text-sm uppercase sport-skew text-white">
+                Setups Voitures
               </h3>
-              
-              <div className="flex items-center gap-2 text-success font-mono font-bold text-xs bg-success/10 border border-success/20 p-3 rounded">
-                <CheckCircle2 className="w-5 h-5 shrink-0" />
-                <span>COUVERTURE ACTIVE</span>
-              </div>
-
-              <p className="text-[11px] text-foreground/50 leading-relaxed font-mono">
-                Votre cotisation annuelle FBA est à jour pour {new Date().getFullYear()}. N'oubliez pas de valider votre check-in GPS en arrivant au circuit.
-              </p>
             </div>
+            <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider bg-purple-500/20 border border-purple-500/40 text-purple-300 animate-pulse flex items-center gap-1">
+              <Sparkles className="w-2.5 h-2.5" /> Bientôt
+            </span>
+          </div>
 
-            {/* Profile Card */}
-            <div className="premium-card p-6 rounded-lg border border-[#353535] space-y-4">
-              <div className="flex items-center justify-between border-b border-[#353535] pb-2">
-                <h3 className="font-anybody font-black text-xs uppercase tracking-wider text-white sport-skew flex items-center gap-2">
-                  <User className="w-4 h-4 text-primary" />
-                  Mon Profil
-                </h3>
-                {!isEditing && (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="text-[10px] text-primary hover:text-secondary font-mono font-bold uppercase cursor-pointer"
-                  >
-                    Modifier
-                  </button>
-                )}
+          <div className="space-y-1">
+            <div className="text-xs font-mono text-white font-bold">
+              Fiches Réglages 1/8 & 1/10
+            </div>
+            <p className="text-[11px] font-mono text-foreground/60 leading-relaxed">
+              Enregistrez vos configurations (huiles, différentiels, pneus, transmission) selon la météo.
+            </p>
+          </div>
+
+          <div className="text-[10px] font-mono text-foreground/40 border-t border-[#353535]/40 pt-2">
+            Module télémétrie en cours de développement
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Section Intermédiaire : Mes Engagements Courses + Documents Officiels */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Mes Engagements Courses */}
+        <div className="premium-card p-6 rounded-lg border border-[#353535] space-y-4">
+          <div className="flex items-center justify-between border-b border-[#353535] pb-3">
+            <div className="flex items-center gap-2">
+              <Trophy className="w-4 h-4 text-primary" />
+              <h3 className="font-anybody font-black text-sm uppercase sport-skew text-white">
+                Mes Engagements Courses ({registrations.length})
+              </h3>
+            </div>
+            <Link
+              href="/events"
+              className="text-[10px] font-mono text-primary hover:underline flex items-center gap-1"
+            >
+              Calendrier complet <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+
+          {registrations.length === 0 ? (
+            <div className="py-8 text-center text-foreground/40 font-mono text-xs space-y-2">
+              <Trophy className="w-8 h-8 mx-auto text-foreground/20" />
+              <p>Aucune course encodée actuellement.</p>
+              <Link href="/events" className="text-primary hover:underline block text-[11px]">
+                Consulter les prochaines courses ouvertes →
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {registrations.map((reg) => (
+                <div
+                  key={reg.id}
+                  className="p-3.5 bg-surface-dim rounded border border-[#353535] space-y-1.5 hover:border-[#454545] transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-anybody font-bold text-xs uppercase sport-skew text-white">
+                      {reg.sbc_events?.title || 'Événement Club'}
+                    </span>
+                    <span className="text-[10px] font-mono text-success font-bold px-2 py-0.5 rounded bg-success/10 border border-success/20">
+                      {reg.total_paid} € • Enregistré
+                    </span>
+                  </div>
+                  <div className="text-[11px] font-mono text-foreground/60">
+                    Catégorie : <strong className="text-primary">{reg.race_category}</strong>
+                  </div>
+                  <div className="flex items-center gap-4 text-[10px] font-mono text-foreground/40 pt-1">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-primary" />
+                      {reg.sbc_events?.event_date}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-primary" />
+                      {reg.sbc_events?.location || 'Seraing'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Documents Officiels & Règlements */}
+        <div className="premium-card p-6 rounded-lg border border-[#353535] space-y-4">
+          <div className="flex items-center justify-between border-b border-[#353535] pb-3">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-primary" />
+              <h3 className="font-anybody font-black text-sm uppercase sport-skew text-white">
+                Documents & Règlements ASBL
+              </h3>
+            </div>
+            <span className="text-[10px] font-mono text-foreground/40">SBC Seraing</span>
+          </div>
+
+          <p className="text-xs font-mono text-foreground/60 leading-relaxed">
+            Consultez les textes réglementaires régissant la pratique sur la piste et les engagements sportifs des membres.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            <button
+              onClick={() => setActiveDocModal('roi')}
+              className="p-4 rounded-lg bg-surface hover:bg-surface-high border border-[#353535] hover:border-primary text-left transition-all cursor-pointer group flex flex-col justify-between space-y-3"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-anybody font-black text-xs uppercase sport-skew text-white group-hover:text-primary transition-colors">
+                    Règlement d'Ordre Intérieur (ROI)
+                  </span>
+                  <FileText className="w-4 h-4 text-primary shrink-0" />
+                </div>
+                <p className="text-[10px] font-mono text-foreground/50 leading-relaxed">
+                  Sécurité piste, ramassage, horaires et respect des installations.
+                </p>
+              </div>
+              <div className="text-[10px] font-mono text-primary flex items-center gap-1 uppercase font-bold">
+                <span>Lire le ROI</span> <ChevronRight className="w-3 h-3" />
+              </div>
+            </button>
+
+            <button
+              onClick={() => setActiveDocModal('charte')}
+              className="p-4 rounded-lg bg-surface hover:bg-surface-high border border-[#353535] hover:border-primary text-left transition-all cursor-pointer group flex flex-col justify-between space-y-3"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-anybody font-black text-xs uppercase sport-skew text-white group-hover:text-primary transition-colors">
+                    Charte du Pilote SBC
+                  </span>
+                  <Award className="w-4 h-4 text-primary shrink-0" />
+                </div>
+                <p className="text-[10px] font-mono text-foreground/50 leading-relaxed">
+                  Fair-play, convivialité, entraide et esprit de club.
+                </p>
+              </div>
+              <div className="text-[10px] font-mono text-primary flex items-center gap-1 uppercase font-bold">
+                <span>Lire la Charte</span> <ChevronRight className="w-3 h-3" />
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Formulaire complet de gestion du Profil Pilote */}
+      <div className="premium-card p-6 md:p-8 rounded-lg border border-[#353535] space-y-6">
+        <div className="flex items-center justify-between border-b border-[#353535] pb-4">
+          <div className="flex items-center gap-2.5">
+            <User className="w-5 h-5 text-primary" />
+            <h2 className="font-anybody font-black text-xl uppercase tracking-tight sport-skew text-white">
+              Mon Profil & Paramètres Piste
+            </h2>
+          </div>
+          <span className="text-[10px] font-mono text-foreground/45 uppercase tracking-wider hidden sm:inline">
+            Fiche Officielle Pilote
+          </span>
+        </div>
+
+        {profileMsg && (
+          <div
+            className={`p-3.5 rounded font-mono text-xs flex items-center gap-2 animate-fade-in ${
+              profileMsg.type === 'success'
+                ? 'bg-success/15 border border-success/30 text-success'
+                : 'bg-secondary/15 border border-secondary/30 text-secondary'
+            }`}
+          >
+            {profileMsg.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+            )}
+            <span>{profileMsg.text}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSaveProfile} className="space-y-6">
+          {/* Section 1 : Identité & Contact */}
+          <div>
+            <h3 className="text-xs font-mono uppercase tracking-wider text-primary font-bold mb-3 flex items-center gap-1.5">
+              <span>1. Identité & Contact</span>
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/60 mb-1">
+                  Prénom *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
+                />
               </div>
 
-              {updateError && (
-                <div className="p-2 rounded bg-secondary/10 border border-secondary/20 text-secondary text-[10px] font-mono">
-                  ⚠️ {updateError}
-                </div>
-              )}
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/60 mb-1">
+                  Nom *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
+                />
+              </div>
 
-              {updateSuccess && (
-                <div className="p-2 rounded bg-success/10 border border-success/20 text-success text-[10px] font-mono">
-                  ✓ {updateSuccess}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-foreground/60">
+                    Adresse Email
+                  </label>
+                  <span className="text-[9px] font-mono text-primary px-1 py-0.2 rounded bg-primary/10 border border-primary/20">
+                    Lié au compte
+                  </span>
                 </div>
-              )}
+                <input
+                  type="email"
+                  disabled
+                  value={user.email || ''}
+                  className="w-full bg-background/50 border border-[#353535] rounded px-3 py-2 text-xs font-mono text-foreground/60 cursor-not-allowed select-none opacity-80"
+                />
+              </div>
 
-              {isEditing ? (
-                <form onSubmit={handleUpdateProfile} className="space-y-3 font-mono text-xs">
-                  <div>
-                    <label className="block text-[9px] text-foreground/50 uppercase">Prénom</label>
-                    <input
-                      type="text"
-                      required
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      className="w-full bg-background border border-[#353535] rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-primary font-sans"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[9px] text-foreground/50 uppercase">Nom</label>
-                    <input
-                      type="text"
-                      required
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      className="w-full bg-background border border-[#353535] rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-primary font-sans"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[9px] text-foreground/50 uppercase">Téléphone</label>
-                    <input
-                      type="text"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="w-full bg-background border border-[#353535] rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[9px] text-foreground/50 uppercase">Licence FBA</label>
-                    <input
-                      type="text"
-                      value={licenseNumber}
-                      onChange={(e) => setLicenseNumber(e.target.value)}
-                      className="w-full bg-background border border-[#353535] rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
-                    />
-                  </div>
-                  <div className="flex gap-2 justify-end pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsEditing(false);
-                        setUpdateError('');
-                      }}
-                      className="px-3 py-1 bg-[#222] border border-[#353535] text-white rounded text-[10px] cursor-pointer"
-                    >
-                      Annuler
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-3 py-1 bg-primary text-black font-bold rounded text-[10px] cursor-pointer hover:bg-secondary hover:text-white transition-colors"
-                    >
-                      Sauver
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <div className="space-y-3 font-mono text-[11px] text-foreground/75">
-                  <div className="flex justify-between border-b border-[#353535]/30 pb-1.5">
-                    <span className="text-foreground/45">Nom :</span>
-                    <span className="text-white font-bold">{profile?.first_name} {profile?.last_name}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-[#353535]/30 pb-1.5">
-                    <span className="text-foreground/45">Téléphone :</span>
-                    <span className="text-white">{profile?.phone || 'Non renseigné'}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-[#353535]/30 pb-1.5">
-                    <span className="text-foreground/45">Licence :</span>
-                    <span className="text-primary font-bold">{profile?.license_number || 'Non renseignée'}</span>
-                  </div>
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/60 mb-1">
+                  Téléphone (GSM) *
+                </label>
+                <div className="relative">
+                  <Phone className="w-3.5 h-3.5 text-foreground/40 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+32 400 00 00 00"
+                    className="w-full bg-background border border-[#353535] rounded pl-8 pr-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
+                  />
                 </div>
-              )}
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/60 mb-1">
+                  Date de Naissance
+                </label>
+                <input
+                  type="date"
+                  value={birthDate}
+                  onChange={(e) => setBirthDate(e.target.value)}
+                  className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Right Column (Registrations & Upcoming Events) */}
-          <div className="lg:col-span-8 space-y-6">
-            
-            {/* User's registered events */}
-            <div className="premium-card p-6 rounded-lg border border-[#353535] space-y-4">
-              <h3 className="font-anybody font-black text-xs uppercase tracking-wider text-white sport-skew border-b border-[#353535] pb-2 flex items-center gap-2">
-                <Trophy className="w-4 h-4 text-primary" />
-                Mes Engagements Courses ({registrations.length})
-              </h3>
+          {/* Section 2 : Adresse postale */}
+          <div className="pt-2 border-t border-[#353535]/60">
+            <h3 className="text-xs font-mono uppercase tracking-wider text-primary font-bold mb-3 flex items-center gap-1.5">
+              <span>2. Adresse Résidentielle</span>
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="sm:col-span-1">
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/60 mb-1">
+                  Rue et Numéro
+                </label>
+                <input
+                  type="text"
+                  value={streetNumber}
+                  onChange={(e) => setStreetNumber(e.target.value)}
+                  placeholder="Ex: Rue de la Piste, 42"
+                  className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
+                />
+              </div>
 
-              {registrations.length === 0 ? (
-                <div className="p-4 text-center text-xs text-foreground/40 font-mono">
-                  Vous n'avez pas d'inscription de course enregistrée.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {registrations.map((reg) => (
-                    <div key={reg.id} className="p-4 bg-surface-dim border border-[#353535] rounded flex flex-col sm:flex-row justify-between gap-4">
-                      <div>
-                        <span className="px-2 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary text-[9px] font-mono font-bold uppercase tracking-wider">
-                          {reg.race_category}
-                        </span>
-                        <h4 className="font-anybody font-black text-sm text-white uppercase sport-skew mt-1.5">
-                          {reg.sbc_events.title}
-                        </h4>
-                        <p className="text-[10px] text-foreground/45 font-mono flex items-center gap-1.5 mt-1">
-                          <MapPin className="w-3 h-3 text-primary" />
-                          {reg.sbc_events.location}
-                        </p>
-                      </div>
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/60 mb-1">
+                  Code Postal
+                </label>
+                <input
+                  type="text"
+                  value={zipCode}
+                  onChange={(e) => setZipCode(e.target.value)}
+                  placeholder="Ex: 4100"
+                  className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
+                />
+              </div>
 
-                      <div className="flex flex-col justify-between text-right font-mono text-xs">
-                        <div className="text-foreground/50">{new Date(reg.sbc_events.event_date).toLocaleDateString('fr-BE')}</div>
-                        <div className="text-success font-bold mt-1">€{parseFloat(reg.total_paid).toFixed(2)}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/60 mb-1">
+                  Ville
+                </label>
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="Ex: Seraing"
+                  className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
+                />
+              </div>
             </div>
+          </div>
 
-            {/* Other upcoming events */}
-            {upcomingEvents.length > 0 && (
-              <div className="premium-card p-6 rounded-lg border border-[#353535] space-y-4">
-                <div className="flex justify-between items-center border-b border-[#353535] pb-2">
-                  <h3 className="font-anybody font-black text-xs uppercase tracking-wider text-white sport-skew flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-primary" />
-                    Courses Ouvertes aux Inscriptions ({upcomingEvents.length})
-                  </h3>
-                  <Link href="/events" className="text-primary hover:text-secondary text-[11px] font-mono hover:underline">
-                    Voir tout
-                  </Link>
+          {/* Section 3 : Paramètres Piste & Licences */}
+          <div className="pt-2 border-t border-[#353535]/60">
+            <h3 className="text-xs font-mono uppercase tracking-wider text-primary font-bold mb-3 flex items-center gap-1.5">
+              <span>3. Paramètres Course & Piste</span>
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/60 mb-1">
+                  Numéro de Licence FBA
+                </label>
+                <div className="relative">
+                  <Hash className="w-3.5 h-3.5 text-foreground/40 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={licenseNumber}
+                    onChange={(e) => setLicenseNumber(e.target.value)}
+                    placeholder="Ex: 1042-BE"
+                    className="w-full bg-background border border-[#353535] rounded pl-8 pr-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/60 mb-1">
+                  Numéro de Transpondeur Personnel (MyLaps / RC4)
+                </label>
+                <div className="relative">
+                  <Radio className="w-3.5 h-3.5 text-foreground/40 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={transponderNumber}
+                    onChange={(e) => setTransponderNumber(e.target.value)}
+                    placeholder="Ex: 7392811"
+                    className="w-full bg-background border border-[#353535] rounded pl-8 pr-3 py-2 text-xs font-mono text-primary font-bold focus:outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4 : Consentements & Règlement (Ultra-visible si non cochés) */}
+          <div id="engagements-section" className="pt-2 border-t border-[#353535]/60">
+            {!roiAccepted || !insuranceAck ? (
+              <div className="p-5 rounded-lg border-2 border-secondary/90 bg-secondary/15 space-y-4 ring-2 ring-secondary/30 shadow-[0_0_30px_rgba(255,50,0,0.15)] animate-pulse">
+                <div className="flex items-center gap-2 text-secondary font-bold text-xs font-mono">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-secondary" />
+                  <span>⚠️ OBLIGATOIRE : Vous devez cocher ces deux engagements pour activer votre accès aux circuits et aux courses.</span>
                 </div>
 
-                <div className="space-y-3">
-                  {upcomingEvents.slice(0, 2).map((event) => (
-                    <div key={event.id} className="p-4 bg-surface/50 border border-[#353535] rounded flex items-center justify-between gap-4 hover:border-primary transition-all">
-                      <div>
-                        <div className="text-[10px] text-foreground/40 font-mono flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-primary" />
-                          {new Date(event.event_date).toLocaleDateString('fr-BE')}
-                        </div>
-                        <h4 className="font-anybody font-black text-sm text-white uppercase sport-skew mt-1">
-                          {event.title}
-                        </h4>
-                      </div>
+                <div className="space-y-3 pt-1">
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={roiAccepted}
+                      onChange={(e) => setRoiAccepted(e.target.checked)}
+                      className="mt-0.5 rounded border-[#353535] text-primary focus:ring-primary h-4 w-4"
+                    />
+                    <span className="text-xs font-mono text-white font-medium leading-relaxed">
+                      J'atteste avoir lu et j'accepte sans réserve le <strong>Règlement d'Ordre Intérieur (ROI)</strong> du Seraing Buggy Club ASBL. *
+                    </span>
+                  </label>
 
-                      <Link
-                        href="/events"
-                        className="px-4 py-1.5 border border-primary text-primary hover:bg-primary hover:text-black font-anybody font-extrabold uppercase text-[10px] tracking-wider transition-all sport-skew shadow-[2px_2px_0px_#000]"
-                      >
-                        <span className="transform skew-x-8">S'inscrire</span>
-                      </Link>
-                    </div>
-                  ))}
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={insuranceAck}
+                      onChange={(e) => setInsuranceAck(e.target.checked)}
+                      className="mt-0.5 rounded border-[#353535] text-primary focus:ring-primary h-4 w-4"
+                    />
+                    <span className="text-xs font-mono text-white font-medium leading-relaxed">
+                      J'ai pris connaissance des conditions d'assurance FBA et de l'obligation de check-in géolocalisé lors de toute présence sur piste. *
+                    </span>
+                  </label>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 rounded-lg border border-success/30 bg-success/10 space-y-3">
+                <div className="flex items-center gap-2 text-success font-bold text-xs font-mono">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-success" />
+                  <span>Engagements réglementaires & Assurance FBA validés</span>
+                </div>
+
+                <div className="space-y-2 pt-1 text-[11px] font-mono text-foreground/80">
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={roiAccepted}
+                      onChange={(e) => setRoiAccepted(e.target.checked)}
+                      className="mt-0.5 rounded border-[#353535] text-primary focus:ring-primary"
+                    />
+                    <span>Règlement d'Ordre Intérieur (ROI) du SBC ASBL accepté.</span>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={insuranceAck}
+                      onChange={(e) => setInsuranceAck(e.target.checked)}
+                      className="mt-0.5 rounded border-[#353535] text-primary focus:ring-primary"
+                    />
+                    <span>Conditions d'assurance FBA et check-in géolocalisé approuvés.</span>
+                  </label>
                 </div>
               </div>
             )}
           </div>
-        </div>
 
-        {/* Bottom Cards from Mockup */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-          <div className="premium-card p-5 rounded-lg border border-[#353535] flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center text-primary">
-                <FileText className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="font-anybody font-black text-sm text-white uppercase sport-skew">
-                  Règlement (ROI)
-                </h4>
-                <p className="text-[10px] text-foreground/50 font-mono">Charte & ROI</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-              <a 
-                href="/reglement-ordre-interieur.pdf"
-                target="_blank"
-                className="px-3.5 py-1.5 bg-[#252525] border border-[#353535] hover:border-primary text-white text-[10px] font-mono uppercase tracking-wider rounded transition-all cursor-pointer text-center"
-              >
-                Lire le ROI
-              </a>
-              <a 
-                href="/charte-bienveillance-comportement.pdf"
-                target="_blank"
-                className="px-3.5 py-1.5 bg-[#252525] border border-[#353535] hover:border-primary text-white text-[10px] font-mono uppercase tracking-wider rounded transition-all cursor-pointer text-center"
-              >
-                Lire la charte
-              </a>
-            </div>
+          {/* Bouton d'enregistrement unique */}
+          <div className="pt-3">
+            <button
+              type="submit"
+              disabled={savingProfile}
+              className="w-full sm:w-auto premium-btn text-xs px-8 py-3 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              <span className="transform skew-x-8">
+                {savingProfile ? 'Enregistrement en cours...' : 'Enregistrer mon profil pilote'}
+              </span>
+            </button>
           </div>
-
-          <div className="premium-card p-5 rounded-lg border border-[#353535] flex items-center justify-between opacity-60">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded bg-foreground/10 flex items-center justify-center text-foreground/50">
-                <Award className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="font-anybody font-black text-sm text-white uppercase sport-skew flex items-center gap-2">
-                  Réglages Voitures
-                  <span className="bg-primary/20 text-primary text-[8px] px-1.5 py-0.2 rounded font-mono font-bold tracking-tight">BIENTÔT</span>
-                </h4>
-                <p className="text-[10px] text-foreground/50 font-mono">Base de données setups & télémétrie</p>
-              </div>
-            </div>
-            <Lock className="w-4 h-4 text-foreground/35 mr-2" />
-          </div>
-        </div>
+        </form>
       </div>
+
+      {/* 5. Modale de Lecture des Documents Officiels (ROI & Charte) */}
+      {activeDocModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto premium-card p-6 md:p-8 rounded-lg border border-[#353535] relative shadow-2xl space-y-5">
+            <button
+              onClick={() => setActiveDocModal(null)}
+              className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-surface border border-transparent hover:border-[#353535] text-foreground/50 hover:text-white transition-all cursor-pointer"
+              title="Fermer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {activeDocModal === 'roi' ? (
+              <div className="space-y-4 font-mono text-xs text-foreground/80">
+                <div className="border-b border-[#353535] pb-3">
+                  <h3 className="font-anybody font-black text-xl uppercase tracking-tight sport-skew text-white">
+                    Règlement d'Ordre Intérieur (ROI)
+                  </h3>
+                  <p className="text-[10px] text-primary mt-0.5">Seraing Buggy Club ASBL • Affilié FBA</p>
+                </div>
+
+                <div className="space-y-3 leading-relaxed text-[11px]">
+                  <p><strong>Article 1 - Accès aux infrastructures :</strong> L'accès aux pistes et aux stands est réservé aux membres en règle de cotisation et aux pilotes munis d'un pass journalier validé.</p>
+                  <p><strong>Article 2 - Sécurité & Assurance :</strong> Tout pilote présent sur le complexe doit impérativement activer son check-in sur l'application officielle afin de garantir sa couverture d'assurance FBA.</p>
+                  <p><strong>Article 3 - Matériel & Motorisation :</strong> Sont admis les buggies et truggies 1/8ème et 1/10ème électriques et thermiques conformes aux normes sonores et de sécurité FBA.</p>
+                  <p><strong>Article 4 - Sens de circulation & Ramassage :</strong> Le sens de circulation balisé sur la piste doit être strictement respecté. Le ramassage s'effectue avec gilet de sécurité dans les zones prévues.</p>
+                  <p><strong>Article 5 - Fermeture & Cadenas :</strong> Le dernier membre quittant les installations est tenu de vérifier la mise hors tension des stands et le reverrouillage strict du cadenas d'entrée.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 font-mono text-xs text-foreground/80">
+                <div className="border-b border-[#353535] pb-3">
+                  <h3 className="font-anybody font-black text-xl uppercase tracking-tight sport-skew text-white">
+                    Charte Sportive & Convivialité
+                  </h3>
+                  <p className="text-[10px] text-primary mt-0.5">Seraing Buggy Club ASBL</p>
+                </div>
+
+                <div className="space-y-3 leading-relaxed text-[11px]">
+                  <p><strong>Esprit de Club :</strong> Le SBC est une association de passionnés où règnent le respect mutuel, la bienveillance et le partage des connaissances mécaniques et de pilotage.</p>
+                  <p><strong>Fair-Play en Piste :</strong> Laisser passer les pilotes plus rapides lors des entraînements libres, éviter les contacts volontaires et préserver le matériel de chacun.</p>
+                  <p><strong>Entraide aux Stands :</strong> Faciliter l'intégration des nouveaux pilotes et participer activement aux sessions bénévoles de maintenance du tracé.</p>
+                  <p><strong>Propreté :</strong> Ne rien jeter au sol, évacuer ses déchets et maintenir les tables de stands propres.</p>
+                </div>
+              </div>
+            )}
+
+            <div className="pt-3 border-t border-[#353535] flex justify-end">
+              <button
+                onClick={() => setActiveDocModal(null)}
+                className="premium-btn text-xs px-6 py-2"
+              >
+                <span className="transform skew-x-8">Fermer la lecture</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

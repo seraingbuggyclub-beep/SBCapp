@@ -27,6 +27,7 @@ interface WeatherData {
 }
 
 export default function WeatherWidget() {
+  const [mounted, setMounted] = useState(false);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +71,7 @@ export default function WeatherWidget() {
   };
 
   useEffect(() => {
+    setMounted(true);
     fetchWeather(false);
     // Rafraîchir toutes les 15 minutes en tâche de fond discrète
     const interval = setInterval(() => {
@@ -156,9 +158,9 @@ export default function WeatherWidget() {
     }
   };
 
-  if (loading && !weather) {
+  if (!mounted || (loading && !weather)) {
     return (
-      <div className="bg-surface border border-[#353535] rounded-xl p-4 flex items-center justify-between min-h-[96px] shadow-[3px_3px_0px_#000]">
+      <div suppressHydrationWarning className="bg-surface border border-[#353535] rounded-xl p-4 flex items-center justify-between min-h-[96px] shadow-[3px_3px_0px_#000]">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-surface-high" />
           <div className="space-y-2">

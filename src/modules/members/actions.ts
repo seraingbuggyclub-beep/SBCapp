@@ -37,7 +37,7 @@ export async function createMemberProfile(profile: MemberProfileCreateInput): Pr
       transponder_number: profile.transponder_number || null,
       roi_accepted: profile.roi_accepted || false,
       insurance_ack: profile.insurance_ack || false,
-      payment_status: 'pending', // par défaut en attente de cotisation
+      payment_status: profile.membership_choice === 'visitor' ? 'paid' : 'pending',
       updated_at: new Date().toISOString(),
     })
     .select()

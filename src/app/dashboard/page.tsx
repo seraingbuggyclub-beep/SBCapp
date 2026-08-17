@@ -922,12 +922,14 @@ export default function DashboardPage() {
       )}
 
       {/* Modale de Paiement de Cotisation */}
-      <MembershipPaymentModal
-        member={profile}
-        isOpen={paymentModalOpen}
-        onClose={() => setPaymentModalOpen(false)}
-        onPaymentUpdated={refreshAuth}
-      />
+      {paymentModalOpen && (
+        <MembershipPaymentModal
+          member={profile}
+          isOpen={paymentModalOpen}
+          onClose={() => setPaymentModalOpen(false)}
+          onPaymentUpdated={refreshAuth}
+        />
+      )}
     </div>
   );
 }

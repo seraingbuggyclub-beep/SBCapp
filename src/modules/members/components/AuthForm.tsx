@@ -13,9 +13,6 @@ import {
   MapPin, 
   Calendar, 
   Hash, 
-  CreditCard, 
-  FileCheck,
-  ShieldAlert
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -36,7 +33,6 @@ export default function AuthForm() {
   const [zipCode, setZipCode] = useState('');
   const [city, setCity] = useState('');
   const [birthDate, setBirthDate] = useState('');
-  const [membershipChoice, setMembershipChoice] = useState('member');
   const [transponderNumber, setTransponderNumber] = useState('');
   const [roiAccepted, setRoiAccepted] = useState(false);
   
@@ -85,7 +81,7 @@ export default function AuthForm() {
           metaData.zip_code = zipCode;
           metaData.city = city;
           metaData.birth_date = birthDate;
-          metaData.membership_choice = membershipChoice;
+          metaData.membership_choice = 'member';
           metaData.transponder_number = transponderNumber || null;
           metaData.roi_accepted = roiAccepted;
         }
@@ -113,7 +109,7 @@ export default function AuthForm() {
             zip_code: zipCode || undefined,
             city: city || undefined,
             birth_date: birthDate || undefined,
-            membership_choice: regType === 'member' ? membershipChoice : 'visitor',
+            membership_choice: regType === 'member' ? 'member' : 'visitor',
             transponder_number: transponderNumber || undefined,
             roi_accepted: regType === 'member' ? roiAccepted : true,
             insurance_ack: insuranceAck,
@@ -343,34 +339,17 @@ export default function AuthForm() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">Cotisation</label>
-                <div className="relative">
-                  <CreditCard className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35" />
-                  <select
-                    value={membershipChoice}
-                    onChange={(e) => setMembershipChoice(e.target.value)}
-                    className="w-full bg-background border border-[#353535] rounded pl-10 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-sans appearance-none cursor-pointer"
-                  >
-                    <option value="member">Annuelle (130 €)</option>
-                    <option value="daily_member">1 Jour (20 €)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">N° Transpondeur (Facultatif)</label>
-                <div className="relative">
-                  <Hash className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35" />
-                  <input
-                    type="text"
-                    value={transponderNumber}
-                    onChange={(e) => setTransponderNumber(e.target.value)}
-                    className="w-full bg-background border border-[#353535] rounded pl-10 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-mono"
-                    placeholder="1234567"
-                  />
-                </div>
+            <div>
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">N° Transpondeur (Facultatif)</label>
+              <div className="relative">
+                <Hash className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35 pointer-events-none" />
+                <input
+                  type="text"
+                  value={transponderNumber}
+                  onChange={(e) => setTransponderNumber(e.target.value)}
+                  className="w-full bg-background border border-[#353535] rounded pl-10 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-mono"
+                  placeholder="Ex: 1234567"
+                />
               </div>
             </div>
 

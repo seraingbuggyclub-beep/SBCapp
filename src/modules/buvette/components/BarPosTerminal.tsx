@@ -15,7 +15,11 @@ import {
   openBarSession,
   createPosOrder,
 } from '../actions';
-import BarQrScannerModal from './BarQrScannerModal';
+import dynamic from 'next/dynamic';
+
+const BarQrScannerModal = dynamic(() => import('./BarQrScannerModal'), {
+  ssr: false,
+});
 import BarCashRegisterCloseModal from './BarCashRegisterCloseModal';
 import {
   Plus,

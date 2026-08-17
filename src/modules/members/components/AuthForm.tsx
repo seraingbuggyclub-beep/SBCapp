@@ -210,6 +210,7 @@ export default function AuthForm() {
               <input
                 type="text"
                 required
+                autoComplete="given-name"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-sans"
@@ -220,6 +221,7 @@ export default function AuthForm() {
               <input
                 type="text"
                 required
+                autoComplete="family-name"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-sans"
@@ -232,10 +234,12 @@ export default function AuthForm() {
           <div>
             <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">Adresse Email</label>
             <div className="relative">
-              <Mail className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35" />
+              <Mail className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35 pointer-events-none" />
               <input
                 type="email"
                 required
+                autoComplete="email"
+                inputMode="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-background border border-[#353535] rounded pl-10 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-sans"
@@ -247,10 +251,11 @@ export default function AuthForm() {
           <div>
             <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">Mot de passe</label>
             <div className="relative">
-              <KeyRound className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35" />
+              <KeyRound className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35 pointer-events-none" />
               <input
                 type="password"
                 required
+                autoComplete={isSignUp ? "new-password" : "current-password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-background border border-[#353535] rounded pl-10 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-sans"
@@ -265,10 +270,12 @@ export default function AuthForm() {
               <div>
                 <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">Téléphone</label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35" />
+                  <Phone className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35 pointer-events-none" />
                   <input
-                    type="text"
+                    type="tel"
                     required
+                    autoComplete="tel"
+                    inputMode="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     className="w-full bg-background border border-[#353535] rounded pl-10 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-mono"
@@ -280,10 +287,11 @@ export default function AuthForm() {
               <div>
                 <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">Date de naissance</label>
                 <div className="relative">
-                  <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35" />
+                  <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35 pointer-events-none" />
                   <input
                     type="date"
                     required
+                    autoComplete="bday"
                     value={birthDate}
                     onChange={(e) => setBirthDate(e.target.value)}
                     className="w-full bg-background border border-[#353535] rounded pl-10 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-mono"
@@ -295,10 +303,11 @@ export default function AuthForm() {
             <div>
               <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/50 mb-1">Rue et numéro</label>
               <div className="relative">
-                <MapPin className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35" />
+                <MapPin className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35 pointer-events-none" />
                 <input
                   type="text"
                   required
+                  autoComplete="street-address"
                   value={streetNumber}
                   onChange={(e) => setStreetNumber(e.target.value)}
                   className="w-full bg-background border border-[#353535] rounded pl-10 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-sans"
@@ -313,6 +322,7 @@ export default function AuthForm() {
                 <input
                   type="text"
                   required
+                  autoComplete="postal-code"
                   value={zipCode}
                   onChange={(e) => setZipCode(e.target.value)}
                   className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-mono"
@@ -324,6 +334,7 @@ export default function AuthForm() {
                 <input
                   type="text"
                   required
+                  autoComplete="address-level2"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-sans"

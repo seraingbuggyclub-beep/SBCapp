@@ -118,10 +118,7 @@ export function PresenceZoneProvider({ children }: { children: React.ReactNode }
       const isTimeElapsed = now - lastUpdateTimeRef.current > 4000;
 
       if (!isZoneBoundaryCrossed && distanceDelta < GPS_DEADBAND_METERS && !isTimeElapsed) {
-        // Micro-oscillation GPS ignorée : évite les re-renders inutiles
-        if (loadingLocation) {
-          setLoadingLocation(false);
-        }
+        setLoadingLocation(false);
         return;
       }
     }
@@ -134,7 +131,7 @@ export function PresenceZoneProvider({ children }: { children: React.ReactNode }
     setDistance(roundedDist);
     setIsInZone(newIsInZone);
     setLoadingLocation(false);
-  }, [loadingLocation]);
+  }, []);
 
   const handleGeoError = useCallback((_err: GeolocationPositionError) => {
     if (isMountedRef.current) {
@@ -165,7 +162,7 @@ export function PresenceZoneProvider({ children }: { children: React.ReactNode }
           }
           resolve();
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 30000 }
       );
     });
   }, [handlePosition, handleGeoError]);
@@ -194,20 +191,18 @@ export function PresenceZoneProvider({ children }: { children: React.ReactNode }
     };
   }, [refreshPresence, supabase]);
 
-  // Suivi continu de géolocalisation avec nettoyage systématique
+  // Suivi continu de géolocalisation avec nettoyage systématique (une seule souscription)
   useEffect(() => {
     if (typeof window === 'undefined' || !navigator.geolocation) {
       setLoadingLocation(false);
       return;
     }
 
-    refreshLocation();
-
-    // Démarrage du watchPosition
+    // Démarrage d'un unique watchPosition léger
     const watchId = navigator.geolocation.watchPosition(
       handlePosition,
       handleGeoError,
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 15000 }
     );
     watchIdRef.current = watchId;
 
@@ -217,7 +212,7 @@ export function PresenceZoneProvider({ children }: { children: React.ReactNode }
         watchIdRef.current = null;
       }
     };
-  }, [refreshLocation, handlePosition, handleGeoError]);
+  }, [handlePosition, handleGeoError]);
 
   // Écoute temps réel des changements de présence Supabase
   useEffect(() => {

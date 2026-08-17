@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import type { Html5Qrcode as Html5QrcodeType } from 'html5-qrcode';
 import { X, Camera, Search, User, AlertCircle, RefreshCw, Check } from 'lucide-react';
 import { MemberBalanceItem } from '@/types/models';
 import { getMemberBarDetails } from '../actions';
@@ -24,7 +24,7 @@ export default function BarQrScannerModal({
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerRef = useRef<Html5QrcodeType | null>(null);
   const readerId = 'bar-qr-reader-region';
 
   useEffect(() => {
@@ -66,6 +66,9 @@ export default function BarQrScannerModal({
       setErrorMsg(null);
 
       try {
+        const { Html5Qrcode } = await import('html5-qrcode');
+        if (!isSubscribed) return;
+
         const html5QrCode = new Html5Qrcode(readerId);
         scannerRef.current = html5QrCode;
 

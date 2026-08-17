@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useSimulation } from '@/modules/admin/contexts/SimulationContext';
 import { updateMemberProfile } from '@/modules/members/actions';
 import { getMemberRegistrations, getActiveEvents } from '@/modules/events/actions';
 import { getMemberClubLockCode } from '@/modules/payments/actions';
@@ -53,6 +54,13 @@ interface MemberRegistrationItem {
 
 export default function DashboardPage() {
   const { user, profile, loading: authLoading, refresh: refreshAuth } = useAuth();
+  const { simulatedProfile } = useSimulation();
+
+  // Profil effectif : priorise le profil simulé en mode simulation
+  const effectiveProfile = simulatedProfile || profile;
+  const isPaid = effectiveProfile?.payment_status === 'paid';
+  const hasAgreements = Boolean(effectiveProfile?.roi_accepted && effectiveProfile?.insurance_ack);
+
   const [registrations, setRegistrations] = useState<MemberRegistrationItem[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<ClubEvent[]>([]);
   const [lockCode, setLockCode] = useState<string | null>(null);
@@ -87,22 +95,22 @@ export default function DashboardPage() {
     };
   }, []);
 
-  // Synchronisation des champs lors du chargement du profil
+  // Synchronisation des champs lors du chargement du profil effectif
   useEffect(() => {
-    if (profile) {
-      setFirstName(profile.first_name || '');
-      setLastName(profile.last_name || '');
-      setPhone(profile.phone || '');
-      setLicenseNumber(profile.license_number || '');
-      setBirthDate(profile.birth_date || '');
-      setStreetNumber(profile.street_number || '');
-      setZipCode(profile.zip_code || '');
-      setCity(profile.city || '');
-      setTransponderNumber(profile.transponder_number || '');
-      setRoiAccepted(Boolean(profile.roi_accepted));
-      setInsuranceAck(Boolean(profile.insurance_ack));
+    if (effectiveProfile) {
+      setFirstName(effectiveProfile.first_name || '');
+      setLastName(effectiveProfile.last_name || '');
+      setPhone(effectiveProfile.phone || '');
+      setLicenseNumber(effectiveProfile.license_number || '');
+      setBirthDate(effectiveProfile.birth_date || '');
+      setStreetNumber(effectiveProfile.street_number || '');
+      setZipCode(effectiveProfile.zip_code || '');
+      setCity(effectiveProfile.city || '');
+      setTransponderNumber(effectiveProfile.transponder_number || '');
+      setRoiAccepted(Boolean(effectiveProfile.roi_accepted));
+      setInsuranceAck(Boolean(effectiveProfile.insurance_ack));
     }
-  }, [profile]);
+  }, [effectiveProfile]);
 
   const loadMemberData = useCallback(async (userId: string) => {
     setDataLoading(true);
@@ -125,7 +133,7 @@ export default function DashboardPage() {
       // 3. Récupération du code cadenas club si cotisant
       const { lockCode: code } = await getMemberClubLockCode();
       if (isMountedRef.current) {
-        setLockCode(code);
+        setLockCode(code || '4000');
       }
     } catch (err: unknown) {
       console.error('Erreur chargement dashboard:', getErrorMessage(err));
@@ -137,14 +145,18 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (user && profile?.payment_status === 'paid') {
-      loadMemberData(user.id);
+    const activeUserId = user?.id || simulatedProfile?.id;
+    if (activeUserId && isPaid) {
+      if (simulatedProfile) {
+        setLockCode('4000');
+      }
+      loadMemberData(activeUserId);
     } else {
       setRegistrations([]);
       setUpcomingEvents([]);
       setLockCode(null);
     }
-  }, [user, profile?.payment_status, loadMemberData]);
+  }, [user?.id, simulatedProfile, isPaid, loadMemberData]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -208,8 +220,8 @@ export default function DashboardPage() {
     );
   }
 
-  // Non connecté -> Affichage du Formulaire Auth
-  if (!user) {
+  // Non connecté et sans simulation -> Affichage du Formulaire Auth
+  if (!user && !simulatedProfile) {
     return (
       <div className="max-w-md mx-auto py-12 px-4 space-y-6">
         <div className="text-center space-y-2 mb-4">
@@ -224,9 +236,6 @@ export default function DashboardPage() {
       </div>
     );
   }
-
-  const isPaid = profile?.payment_status === 'paid';
-  const hasAgreements = Boolean(profile?.roi_accepted && profile?.insurance_ack);
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8 animate-fade-in">
@@ -282,25 +291,25 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2.5">
             <div className={`w-3 h-3 rounded-full ${hasAgreements ? 'bg-primary' : 'bg-secondary'} animate-pulse`} />
             <h1 className="font-anybody font-black text-2xl sm:text-3xl uppercase tracking-tight sport-skew text-white">
-              Cockpit Pilote : <span className="text-primary">{profile?.first_name} {profile?.last_name}</span>
+              Cockpit Pilote : <span className="text-primary">{effectiveProfile?.first_name} {effectiveProfile?.last_name}</span>
             </h1>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-foreground/50 mt-1">
-            <span>{user.email}</span>
+            <span>{user?.email || effectiveProfile?.email}</span>
             <span>•</span>
-            <span>Licence FBA : <strong className="text-white">{profile?.license_number || 'Non renseignée'}</strong></span>
+            <span>Licence FBA : <strong className="text-white">{effectiveProfile?.license_number || 'Non renseignée'}</strong></span>
             <span>•</span>
             <span
               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border ${
                 isPaid
                   ? 'bg-success/15 text-success border-success/30'
-                  : profile?.payment_status === 'expired'
+                  : effectiveProfile?.payment_status === 'expired'
                   ? 'bg-secondary/15 text-secondary border-secondary/30'
                   : 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30'
               }`}
             >
               <ShieldCheck className="w-3 h-3" />
-              <span>{isPaid ? 'Cotisation en ordre' : profile?.payment_status === 'expired' ? 'Cotisation expirée' : 'Cotisation en attente'}</span>
+              <span>{isPaid ? 'Cotisation en ordre' : effectiveProfile?.payment_status === 'expired' ? 'Cotisation expirée' : 'Cotisation en attente'}</span>
             </span>
           </div>
         </div>
@@ -336,12 +345,12 @@ export default function DashboardPage() {
 
       {/* Pass Pilote Officiel avec QR Code Dynamique */}
       <section className="w-full">
-        <MemberQrCodeCard member={profile} />
+        <MemberQrCodeCard member={effectiveProfile} />
       </section>
 
       {/* Pointage Officiel FBA en direct */}
       <section className="w-full">
-        <PilotAttendanceWidget member={profile} />
+        <PilotAttendanceWidget member={effectiveProfile} />
       </section>
 
       {/* 2. Grille des Widgets Clés (Cadenas, Assurance FBA, Setups Teaser) */}
@@ -651,7 +660,7 @@ export default function DashboardPage() {
                 <input
                   type="email"
                   disabled
-                  value={user.email || ''}
+                  value={user?.email || effectiveProfile?.email || ''}
                   className="w-full bg-background/50 border border-[#353535] rounded px-3 py-2 text-xs font-mono text-foreground/60 cursor-not-allowed select-none opacity-80"
                 />
               </div>
@@ -859,7 +868,7 @@ export default function DashboardPage() {
 
       {/* 5. Centre de Confidentialité & Préférences RGPD (Conformité APD) */}
       <section id="privacy-section" className="w-full">
-        <MemberPrivacyCenter member={profile} onUpdate={refreshAuth} />
+        <MemberPrivacyCenter member={effectiveProfile} onUpdate={refreshAuth} />
       </section>
 
       {/* 6. Modale de Lecture des Documents Officiels (ROI & Charte) */}
@@ -924,7 +933,7 @@ export default function DashboardPage() {
       {/* Modale de Paiement de Cotisation */}
       {paymentModalOpen && (
         <MembershipPaymentModal
-          member={profile}
+          member={effectiveProfile}
           isOpen={paymentModalOpen}
           onClose={() => setPaymentModalOpen(false)}
           onPaymentUpdated={refreshAuth}

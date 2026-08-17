@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { PermissionsMatrix } from '@/modules/admin/components/PermissionsMatrix';
 import { usePermissions } from '@/modules/admin/hooks/usePermissions';
 import { useSimulation } from '@/modules/admin/contexts/SimulationContext';
+import AdminNav from '@/components/admin/AdminNav';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -319,6 +320,8 @@ export default function AdminPage() {
           Rafraîchir
         </button>
       </div>
+
+      <AdminNav />
 
       {updateMsg && (
         <div className="p-3 rounded bg-success/15 border border-success/30 text-success text-xs font-mono">

@@ -184,26 +184,47 @@ CREATE TABLE IF NOT EXISTS sbc_events (
     title text NOT NULL,
     description text,
     event_date date NOT NULL,
-    start_time time NOT NULL,
-    end_time time NOT NULL,
-    category text NOT NULL,                                  -- Ex: 'Ligue Buggy', 'Social', 'Crawler'
+    start_time time NOT NULL DEFAULT '09:00:00',
+    end_time time NOT NULL DEFAULT '18:00:00',
+    category text NOT NULL DEFAULT 'Compétition',          -- Ex: 'Ligue Buggy', 'Social', 'Course Nocturne'
     location text NOT NULL DEFAULT 'Seraing Buggy Track, Belgium',
     registration_fee numeric(10, 2) NOT NULL DEFAULT 0.00,
+    status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed', 'draft')),
+    event_type text NOT NULL DEFAULT 'sbc_race' CHECK (event_type IN ('sbc_race', 'belgian_championship', 'holiday', 'club_meeting')),
+    has_registration boolean NOT NULL DEFAULT true,
+    external_link text,
+    categories jsonb DEFAULT '[{"name": "1/10 Buggy 2WD", "fee": 25, "type": "Electric"}, {"name": "1/8 E-Buggy", "fee": 30, "type": "Electric"}, {"name": "1/8 Nitro Buggy", "fee": 35, "type": "Nitro"}, {"name": "Crawler Meet", "fee": 15, "type": "Social"}]'::jsonb,
+    meal_options jsonb DEFAULT '[{"name": "Lunch Pack", "price": 12, "desc": "Sandwich, boisson & snack"}, {"name": "Barbecue Samedi Soir", "price": 22, "desc": "3 viandes, buffet salade & 1 boisson"}]'::jsonb,
+    max_participants integer,
     created_at timestamptz DEFAULT now()
 );
+
+-- Assurer que les colonnes existent sur les bases de données existantes
+ALTER TABLE sbc_events ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'open';
+ALTER TABLE sbc_events ADD COLUMN IF NOT EXISTS event_type text NOT NULL DEFAULT 'sbc_race';
+ALTER TABLE sbc_events ADD COLUMN IF NOT EXISTS has_registration boolean NOT NULL DEFAULT true;
+ALTER TABLE sbc_events ADD COLUMN IF NOT EXISTS external_link text;
+ALTER TABLE sbc_events ADD COLUMN IF NOT EXISTS categories jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE sbc_events ADD COLUMN IF NOT EXISTS meal_options jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE sbc_events ADD COLUMN IF NOT EXISTS max_participants integer;
 
 -- Inscriptions aux événements par les pilotes
 CREATE TABLE IF NOT EXISTS sbc_event_registrations (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     event_id uuid NOT NULL REFERENCES sbc_events(id) ON DELETE CASCADE,
     member_id uuid NOT NULL REFERENCES sbc_members(id) ON DELETE CASCADE,
-    race_category text NOT NULL,                             -- Ex: '1/10 Buggy 2WD', '1/8 Nitro Buggy'
-    food_options text[] DEFAULT '{}',                       -- Ex: ['Lunch Pack', 'BBQ']
+    race_category text NOT NULL,                             -- Ex: '1/10 Buggy 2WD, 1/8 Nitro Buggy'
+    food_options text[] DEFAULT '{}',                       -- Ex: ['Lunch Pack x2', 'BBQ x1']
+    selected_meals jsonb DEFAULT '[]'::jsonb,               -- Ex: [{"name": "Lunch Pack", "quantity": 2, "unit_price": 12}]
+    selected_categories jsonb DEFAULT '[]'::jsonb,          -- Ex: [{"name": "1/10 Buggy 2WD", "fee": 25}]
     transponder_id text,                                     -- N° de transpondeur AMB/MyLaps
     total_paid numeric(10, 2) NOT NULL DEFAULT 0.00,
     created_at timestamptz DEFAULT now(),
     UNIQUE(event_id, member_id)                              -- Inscription unique par événement
 );
+
+ALTER TABLE sbc_event_registrations ADD COLUMN IF NOT EXISTS selected_meals jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE sbc_event_registrations ADD COLUMN IF NOT EXISTS selected_categories jsonb DEFAULT '[]'::jsonb;
 
 ALTER TABLE sbc_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sbc_event_registrations ENABLE ROW LEVEL SECURITY;
@@ -213,10 +234,28 @@ DROP POLICY IF EXISTS "Lecture publique des evenements" ON sbc_events;
 CREATE POLICY "Lecture publique des evenements" ON sbc_events
     FOR SELECT USING (true);
 
+-- Politiques de gestion admin pour les événements
+DROP POLICY IF EXISTS "Les admins peuvent gerer les evenements" ON sbc_events;
+CREATE POLICY "Les admins peuvent gerer les evenements" ON sbc_events
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM sbc_members 
+            WHERE sbc_members.id = auth.uid() 
+              AND (sbc_members.role = 'admin' OR sbc_members.email = 'stefga1@gmail.com')
+        )
+    );
+
 -- Politiques d'inscription
 DROP POLICY IF EXISTS "Les membres peuvent lire leurs propres inscriptions" ON sbc_event_registrations;
 CREATE POLICY "Les membres peuvent lire leurs propres inscriptions" ON sbc_event_registrations
-    FOR SELECT USING (auth.uid() = member_id);
+    FOR SELECT USING (
+        auth.uid() = member_id OR
+        EXISTS (
+            SELECT 1 FROM sbc_members 
+            WHERE sbc_members.id = auth.uid() 
+              AND (sbc_members.role = 'admin' OR sbc_members.email = 'stefga1@gmail.com')
+        )
+    );
 
 DROP POLICY IF EXISTS "Les membres peuvent s'inscrire aux evenements" ON sbc_event_registrations;
 CREATE POLICY "Les membres peuvent s'inscrire aux evenements" ON sbc_event_registrations
@@ -228,6 +267,27 @@ CREATE POLICY "Les membres peuvent s'inscrire aux evenements" ON sbc_event_regis
               AND sbc_members.payment_status = 'paid'
         )
     );
+
+DROP POLICY IF EXISTS "Les pilotes peuvent modifier leur propre inscription" ON sbc_event_registrations;
+CREATE POLICY "Les pilotes peuvent modifier leur propre inscription" 
+ON sbc_event_registrations 
+FOR UPDATE 
+USING (
+    auth.uid() = member_id OR
+    EXISTS (
+        SELECT 1 FROM sbc_members 
+        WHERE sbc_members.id = auth.uid() 
+          AND (sbc_members.role = 'admin' OR sbc_members.email = 'stefga1@gmail.com')
+    )
+)
+WITH CHECK (
+    auth.uid() = member_id OR
+    EXISTS (
+        SELECT 1 FROM sbc_members 
+        WHERE sbc_members.id = auth.uid() 
+          AND (sbc_members.role = 'admin' OR sbc_members.email = 'stefga1@gmail.com')
+    )
+);
 
 -- Seed de démonstration pour l'événement principal
 INSERT INTO sbc_events (title, description, event_date, start_time, end_time, category, registration_fee)

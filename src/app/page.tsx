@@ -6,6 +6,7 @@ import FbaDisclaimer from '@/modules/presence/components/FbaDisclaimer';
 import { Trophy, Shield, MapPin, Key, Radio, Navigation, UserCheck, LockOpen } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import LockCodeWidget from '@/modules/admin/components/LockCodeWidget';
+import EventsCalendarView from '@/modules/events/components/EventsCalendarView';
 
 export const revalidate = 0; // Force SSR
 
@@ -116,7 +117,11 @@ export default async function LandingPage() {
         <section className="max-w-3xl mx-auto">
           <PresenceList presences={activePresences || []} />
         </section>
-        
+
+        {/* Interactive Club Events & Belgian Holidays Calendar */}
+        <section className="w-full pt-4">
+          <EventsCalendarView />
+        </section>
       </div>
     </div>
   );

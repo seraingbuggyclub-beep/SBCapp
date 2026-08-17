@@ -159,6 +159,13 @@ export interface Database {
           category: string
           location: string
           registration_fee: number
+          status: string
+          event_type: 'sbc_race' | 'belgian_championship' | 'holiday' | 'club_meeting'
+          has_registration: boolean
+          external_link: string | null
+          categories: Json | null
+          meal_options: Json | null
+          max_participants: number | null
           created_at: string | null
         }
         Insert: {
@@ -166,11 +173,18 @@ export interface Database {
           title: string
           description?: string | null
           event_date: string
-          start_time: string
-          end_time: string
-          category: string
+          start_time?: string
+          end_time?: string
+          category?: string
           location?: string
           registration_fee?: number
+          status?: string
+          event_type?: 'sbc_race' | 'belgian_championship' | 'holiday' | 'club_meeting'
+          has_registration?: boolean
+          external_link?: string | null
+          categories?: Json | null
+          meal_options?: Json | null
+          max_participants?: number | null
           created_at?: string | null
         }
         Update: {
@@ -183,6 +197,13 @@ export interface Database {
           category?: string
           location?: string
           registration_fee?: number
+          status?: string
+          event_type?: 'sbc_race' | 'belgian_championship' | 'holiday' | 'club_meeting'
+          has_registration?: boolean
+          external_link?: string | null
+          categories?: Json | null
+          meal_options?: Json | null
+          max_participants?: number | null
           created_at?: string | null
         }
         Relationships: []
@@ -194,6 +215,8 @@ export interface Database {
           member_id: string
           race_category: string
           food_options: string[] | null
+          selected_meals: Json | null
+          selected_categories: Json | null
           transponder_id: string | null
           total_paid: number
           created_at: string | null
@@ -204,6 +227,8 @@ export interface Database {
           member_id: string
           race_category: string
           food_options?: string[] | null
+          selected_meals?: Json | null
+          selected_categories?: Json | null
           transponder_id?: string | null
           total_paid?: number
           created_at?: string | null
@@ -214,6 +239,8 @@ export interface Database {
           member_id?: string
           race_category?: string
           food_options?: string[] | null
+          selected_meals?: Json | null
+          selected_categories?: Json | null
           transponder_id?: string | null
           total_paid?: number
           created_at?: string | null

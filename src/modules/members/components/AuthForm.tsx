@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { createMemberProfile } from '../actions';
 import { 
   KeyRound, 
   Mail, 
@@ -13,7 +14,8 @@ import {
   Calendar, 
   Hash, 
   CreditCard, 
-  FileCheck 
+  FileCheck,
+  ShieldAlert
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -26,6 +28,7 @@ export default function AuthForm() {
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [insuranceAck, setInsuranceAck] = useState(false);
   
   // Champs spécifiques Adhérent
   const [phone, setPhone] = useState('');
@@ -52,6 +55,11 @@ export default function AuthForm() {
 
     try {
       if (isSignUp) {
+        // Validation stricte de l'acquittement assurance FBA
+        if (!insuranceAck) {
+          throw new Error("Vous devez obligatoirement accepter l'engagement d'enregistrement pour être couvert par l'assurance FBA.");
+        }
+
         // Validation dynamique côté client
         if (regType === 'member') {
           if (!phone) throw new Error("Le numéro de téléphone est obligatoire.");
@@ -67,6 +75,8 @@ export default function AuthForm() {
           first_name: firstName,
           last_name: lastName,
           registration_type: regType,
+          insurance_ack: insuranceAck,
+          has_accepted_insurance_terms: insuranceAck,
         };
 
         if (regType === 'member') {
@@ -90,6 +100,25 @@ export default function AuthForm() {
         });
 
         if (authError) throw authError;
+
+        // Créer ou mettre à jour le profil membre dans la base de données
+        if (authData.user) {
+          await createMemberProfile({
+            id: authData.user.id,
+            email,
+            first_name: firstName,
+            last_name: lastName,
+            phone: phone || undefined,
+            street_number: streetNumber || undefined,
+            zip_code: zipCode || undefined,
+            city: city || undefined,
+            birth_date: birthDate || undefined,
+            membership_choice: regType === 'member' ? membershipChoice : 'visitor',
+            transponder_number: transponderNumber || undefined,
+            roi_accepted: regType === 'member' ? roiAccepted : true,
+            insurance_ack: insuranceAck,
+          });
+        }
 
         setSuccessMsg("Inscription réussie ! Vous pouvez maintenant vous connecter.");
         setIsSignUp(false);
@@ -343,6 +372,22 @@ export default function AuthForm() {
                 J'accepte le <span className="text-primary hover:text-white underline cursor-pointer">Règlement d'Ordre Intérieur (ROI)</span> du club.
               </label>
             </div>
+          </div>
+        )}
+
+        {isSignUp && (
+          <div className="p-3.5 rounded bg-secondary/10 border border-secondary/25 flex items-start gap-2.5 mt-4">
+            <input
+              id="fba-insurance-ack"
+              type="checkbox"
+              required
+              checked={insuranceAck}
+              onChange={(e) => setInsuranceAck(e.target.checked)}
+              className="mt-0.5 w-4 h-4 bg-background border border-[#353535] rounded checked:bg-secondary accent-secondary text-white cursor-pointer shrink-0"
+            />
+            <label htmlFor="fba-insurance-ack" className="text-xs text-foreground/90 leading-relaxed font-sans select-none">
+              Je reconnais que je dois obligatoirement m'enregistrer dans le registre de présence à mon arrivée sur la piste pour être couvert par l'assurance FBA. <span className="text-secondary font-bold">*</span>
+            </label>
           </div>
         )}
 

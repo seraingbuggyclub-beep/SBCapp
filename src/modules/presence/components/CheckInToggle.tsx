@@ -3,18 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import { checkInMember, checkOutMember } from '../actions';
 import { MapPin, ToggleLeft, ToggleRight, Radio, Compass, Navigation, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { usePresenceZone, SBC_LAT, SBC_LNG, GEOFENCE_RADIUS_METERS, calculateHaversineDistance } from '../contexts/PresenceZoneContext';
 
 interface CheckInToggleProps {
   memberId: string;
   initialPresence: any;
 }
 
-// Coordonnées du SBC
-const SBC_LAT = 50.599627;
-const SBC_LNG = 5.529321;
-const GEOFENCE_RADIUS = 150; // 150m
-
 export default function CheckInToggle({ memberId, initialPresence }: CheckInToggleProps) {
+  const presenceContext = usePresenceZone();
   const [presence, setPresence] = useState<any>(initialPresence);
   const [checkInType, setCheckInType] = useState<'auto' | 'manual'>('auto');
   const [isPublic, setIsPublic] = useState(true);
@@ -28,19 +25,7 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
 
   // Haversine formula to compute distance in meters
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371e3; // Earth radius in meters
-    const phi1 = (lat1 * Math.PI) / 180;
-    const phi2 = (lat2 * Math.PI) / 180;
-    const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
-    const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
-
-    const a =
-      Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
-      Math.cos(phi1) * Math.cos(phi2) *
-      Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    return R * c; // in meters
+    return calculateHaversineDistance(lat1, lon1, lat2, lon2);
   };
 
   // Log status helper
@@ -68,7 +53,7 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
           const dist = calculateDistance(latitude, longitude, SBC_LAT, SBC_LNG);
           setDistance(Math.round(dist));
 
-          const inside = dist <= GEOFENCE_RADIUS;
+          const inside = dist <= GEOFENCE_RADIUS_METERS;
           setInsideGeofence(inside);
           setGeolocating(false);
 
@@ -118,6 +103,7 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
       } else {
         setPresence(data);
         logStatus(`Présence validée en mode ${finalType === 'auto' ? 'Automatique' : 'Manuel'}.`);
+        await presenceContext.refreshPresence();
       }
     } catch (err: any) {
       logStatus(`Erreur système : ${err.message}`);
@@ -160,6 +146,7 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
         setCoords(null);
         setInsideGeofence(null);
         logStatus("Check-out effectué. Vous n'êtes plus encodé en piste.");
+        await presenceContext.refreshPresence();
       }
     } catch (err: any) {
       logStatus(`Erreur système : ${err.message}`);

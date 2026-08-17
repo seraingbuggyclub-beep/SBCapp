@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS sbc_members (
     membership_choice text,
     transponder_number text,
     roi_accepted boolean DEFAULT false,
+    insurance_ack boolean DEFAULT false,
     created_at timestamptz DEFAULT now(),
     updated_at timestamptz DEFAULT now()
 );
@@ -41,6 +42,7 @@ ALTER TABLE sbc_members ADD COLUMN IF NOT EXISTS birth_date date;
 ALTER TABLE sbc_members ADD COLUMN IF NOT EXISTS membership_choice text;
 ALTER TABLE sbc_members ADD COLUMN IF NOT EXISTS transponder_number text;
 ALTER TABLE sbc_members ADD COLUMN IF NOT EXISTS roi_accepted boolean DEFAULT false;
+ALTER TABLE sbc_members ADD COLUMN IF NOT EXISTS insurance_ack boolean DEFAULT false;
 
 
 -- Table des présences (Assurance FBA)

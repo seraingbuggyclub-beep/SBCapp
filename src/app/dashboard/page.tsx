@@ -6,6 +6,7 @@ import { getMemberProfile, updateMemberProfile } from '@/modules/members/actions
 import { getMemberRegistrations, getActiveEvents } from '@/modules/events/actions';
 import AuthForm from '@/modules/members/components/AuthForm';
 import CadenasLock from '@/modules/payments/components/CadenasLock';
+import FbaDisclaimer from '@/modules/presence/components/FbaDisclaimer';
 import { User, Phone, FileText, CheckCircle2, Award, Calendar, Clock, MapPin, Trophy, ShieldCheck, Lock, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
@@ -118,6 +119,7 @@ export default function DashboardPage() {
   if (profile && profile.payment_status !== 'paid') {
     return (
       <div className="max-w-md mx-auto py-16 space-y-6">
+        <FbaDisclaimer />
         <CadenasLock userId={user.id} onUnlocked={loadDashboardData} />
       </div>
     );
@@ -130,6 +132,9 @@ export default function DashboardPage() {
 
       {/* Main content grid in a centered container */}
       <div className="w-full max-w-6xl mx-auto px-6 py-12 space-y-8 relative z-10">
+        {/* FBA Insurance dynamic alert */}
+        <FbaDisclaimer />
+
         {/* Simple Dashboard Welcome Banner */}
         <div className="premium-card p-6 md:p-8 rounded-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-[#353535]">
           <div className="space-y-1.5">

@@ -52,6 +52,7 @@ export interface Database {
           membership_choice: string | null
           transponder_number: string | null
           roi_accepted: boolean | null
+          insurance_ack: boolean | null
           created_at: string | null
           updated_at: string | null
         }
@@ -70,6 +71,7 @@ export interface Database {
           membership_choice?: string | null
           transponder_number?: string | null
           roi_accepted?: boolean | null
+          insurance_ack?: boolean | null
           created_at?: string | null
           updated_at?: string | null
         }
@@ -88,6 +90,7 @@ export interface Database {
           membership_choice?: string | null
           transponder_number?: string | null
           roi_accepted?: boolean | null
+          insurance_ack?: boolean | null
           created_at?: string | null
           updated_at?: string | null
         }

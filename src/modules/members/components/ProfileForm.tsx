@@ -102,6 +102,7 @@ export default function ProfileForm() {
         birth_date: birthDate,
         transponder_number: transponderNumber || undefined,
         roi_accepted: roiAccepted,
+        insurance_ack: profile.insurance_ack ?? true,
       });
 
       if (error) throw new Error(error);

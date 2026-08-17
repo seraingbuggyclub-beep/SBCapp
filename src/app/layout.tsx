@@ -3,6 +3,7 @@ import "./globals.css";
 import Navbar from "@/components/app-shell/navbar";
 import ServiceWorkerRegister from "@/components/pwa/ServiceWorkerRegister";
 import { SimulationProvider } from "@/modules/admin/contexts/SimulationContext";
+import { PresenceZoneProvider } from "@/modules/presence/contexts/PresenceZoneContext";
 
 export const viewport: Viewport = {
   themeColor: "#ff6e00",
@@ -41,18 +42,20 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background text-foreground selection:bg-primary selection:text-black">
         <ServiceWorkerRegister />
         <SimulationProvider>
-          <div className="flex flex-col min-h-screen">
-            {/* Top Navbar */}
-            <Navbar />
-            
-            {/* Main App Body */}
-            <div className="flex flex-col flex-1">
-              {/* Page Content - Edge-to-edge for full-width components */}
-              <main className="flex-1">
-                {children}
-              </main>
+          <PresenceZoneProvider>
+            <div className="flex flex-col min-h-screen">
+              {/* Top Navbar */}
+              <Navbar />
+              
+              {/* Main App Body */}
+              <div className="flex flex-col flex-1">
+                {/* Page Content - Edge-to-edge for full-width components */}
+                <main className="flex-1">
+                  {children}
+                </main>
+              </div>
             </div>
-          </div>
+          </PresenceZoneProvider>
         </SimulationProvider>
       </body>
     </html>

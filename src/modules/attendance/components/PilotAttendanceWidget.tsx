@@ -47,21 +47,27 @@ export default function PilotAttendanceWidget({
   const [elapsedMinutes, setElapsedMinutes] = useState<number>(0);
 
   const loadData = useCallback(async () => {
-    if (!member) return;
+    if (!member?.id) return;
     setLoading(true);
 
-    const [tracksRes, activeRes] = await Promise.all([
-      getTracks(),
-      getCurrentMemberActiveAttendance(member.id),
-    ]);
+    try {
+      const [tracksRes, activeRes] = await Promise.all([
+        getTracks(),
+        getCurrentMemberActiveAttendance(member.id),
+      ]);
 
-    setTracks(tracksRes.data || []);
-    if (tracksRes.data && tracksRes.data.length > 0 && !selectedTrackId) {
-      setSelectedTrackId(tracksRes.data[0].id);
+      const fetchedTracks = tracksRes.data || [];
+      setTracks(fetchedTracks);
+      if (fetchedTracks.length > 0) {
+        setSelectedTrackId((prev) => (prev ? prev : fetchedTracks[0].id));
+      }
+      setActiveSession(activeRes.data);
+    } catch (err) {
+      console.error('Erreur chargement présence FBA:', err);
+    } finally {
+      setLoading(false);
     }
-    setActiveSession(activeRes.data);
-    setLoading(false);
-  }, [member, selectedTrackId]);
+  }, [member?.id]);
 
   useEffect(() => {
     loadData();
@@ -156,8 +162,8 @@ export default function PilotAttendanceWidget({
         </div>
 
         {activeSession ? (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-500/15 border border-green-500/30 text-green-400 text-[10px] font-mono font-bold uppercase tracking-wider animate-pulse">
-            <span className="w-2 h-2 rounded-full bg-green-400" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/15 border border-green-500/40 text-green-400 text-[10px] font-mono font-bold uppercase tracking-wider">
+            <span className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.8)]" />
             En Piste
           </span>
         ) : (

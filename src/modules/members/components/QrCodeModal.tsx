@@ -37,7 +37,7 @@ export default function QrCodeModal({ member, isOpen, onClose }: QrCodeModalProp
   const theme = getMemberQrTheme(member.payment_status);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 animate-fade-in">
       {/* Click outside backdrop */}
       <div className="absolute inset-0" onClick={onClose} />
 

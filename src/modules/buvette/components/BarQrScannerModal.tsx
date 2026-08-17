@@ -28,18 +28,38 @@ export default function BarQrScannerModal({
   const readerId = 'bar-qr-reader-region';
 
   useEffect(() => {
-    if (!isOpen) {
-      if (scannerRef.current && cameraActive) {
-        scannerRef.current.stop().catch(() => {}).then(() => {
-          scannerRef.current?.clear();
-          scannerRef.current = null;
-        });
-        setCameraActive(false);
-      }
-      return;
-    }
+    if (!isOpen) return;
 
     let isSubscribed = true;
+
+    const stopAllTracks = () => {
+      try {
+        const videoElem = document.querySelector(`#${readerId} video`) as HTMLVideoElement | null;
+        if (videoElem && videoElem.srcObject) {
+          const stream = videoElem.srcObject as MediaStream;
+          stream.getTracks().forEach((track) => track.stop());
+          videoElem.srcObject = null;
+        }
+      } catch (e) {
+        console.warn('Erreur coupure pistes vidéo:', e);
+      }
+    };
+
+    const cleanupScanner = async () => {
+      if (scannerRef.current) {
+        try {
+          if (scannerRef.current.isScanning) {
+            await scannerRef.current.stop();
+          }
+          scannerRef.current.clear();
+        } catch (e) {
+          console.warn('Scanner stop error:', e);
+        } finally {
+          scannerRef.current = null;
+        }
+      }
+      stopAllTracks();
+    };
 
     const startScanner = async () => {
       setCameraError(null);
@@ -67,11 +87,8 @@ export default function BarQrScannerModal({
               setLoading(false);
 
               if (res.data) {
-                // Arrêt scanner
-                try {
-                  await html5QrCode.stop();
-                  html5QrCode.clear();
-                } catch {}
+                // Arrêt scanner et libération caméra immédiate
+                await cleanupScanner();
                 onMemberSelected(res.data);
                 onClose();
               } else {
@@ -85,6 +102,7 @@ export default function BarQrScannerModal({
         if (isSubscribed) setCameraActive(true);
       } catch (err: unknown) {
         if (isSubscribed) {
+          stopAllTracks();
           const msg = err instanceof Error ? err.message : 'Caméra indisponible';
           setCameraError(msg);
           setCameraActive(false);
@@ -94,17 +112,12 @@ export default function BarQrScannerModal({
 
     const timer = setTimeout(() => {
       startScanner();
-    }, 200);
+    }, 150);
 
     return () => {
       isSubscribed = false;
       clearTimeout(timer);
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {}).then(() => {
-          scannerRef.current?.clear();
-          scannerRef.current = null;
-        });
-      }
+      cleanupScanner();
     };
   }, [isOpen, onClose, onMemberSelected]);
 
@@ -131,7 +144,7 @@ export default function BarQrScannerModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 animate-fade-in">
       <div className="absolute inset-0" onClick={onClose} />
 
       <div className="relative z-10 w-full max-w-md bg-[#0f0f0f] border border-[#353535] rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col">

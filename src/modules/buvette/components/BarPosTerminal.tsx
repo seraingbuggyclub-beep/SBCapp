@@ -761,14 +761,16 @@ export default function BarPosTerminal() {
       )}
 
       {/* SCANNER MODAL */}
-      <BarQrScannerModal
-        isOpen={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        onMemberSelected={(member) => {
-          setSelectedBuyer(member);
-          setMsg({ text: `Membre identifié : ${member.first_name} ${member.last_name}`, type: 'success' });
-        }}
-      />
+      {scannerOpen && (
+        <BarQrScannerModal
+          isOpen={scannerOpen}
+          onClose={() => setScannerOpen(false)}
+          onMemberSelected={(member) => {
+            setSelectedBuyer(member);
+            setMsg({ text: `Membre identifié : ${member.first_name} ${member.last_name}`, type: 'success' });
+          }}
+        />
+      )}
 
       {/* CLOSING SESSION MODAL */}
       {session && (

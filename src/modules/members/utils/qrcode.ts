@@ -62,7 +62,7 @@ export function getMemberQrTheme(paymentStatus?: string | PaymentStatus | null):
     fgColor: '#EF4444',
     bgColor: '#180a0a',
     badgeText: isExpired ? 'Cotisation expirée • Renouvellement requis' : 'Cotisation non réglée • Accès restreint',
-    badgeClass: 'bg-red-500/15 text-red-400 border-red-500/40 animate-pulse',
+    badgeClass: 'bg-red-500/15 text-red-400 border-red-500/40',
     containerBorder: 'border-red-500/40 hover:border-red-500/60',
     glowClass: 'shadow-[0_0_20px_rgba(239,68,68,0.25)]',
     statusLabel: isExpired ? 'Expiré' : 'En attente',

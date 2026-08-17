@@ -33,7 +33,7 @@ export default function FbaDisclaimer({
   // Vue spécifique sur la page /check-in
   if (isCheckInView) {
     return (
-      <div className="w-full p-4 rounded-lg bg-secondary/15 border-2 border-secondary/40 flex items-start gap-3 shadow-[0_4px_15px_rgba(230,33,23,0.18)] animate-pulse transition-all">
+      <div className="w-full p-4 rounded-lg bg-secondary/15 border-2 border-secondary/40 flex items-start gap-3 shadow-[0_4px_15px_rgba(230,33,23,0.18)] transition-all">
         <ShieldAlert className="w-5 h-5 text-secondary shrink-0 mt-0.5" />
         <div className="space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
@@ -56,7 +56,7 @@ export default function FbaDisclaimer({
   return (
     <Link
       href="/check-in"
-      className="block w-full p-4 rounded-lg bg-secondary/15 border-2 border-secondary/40 hover:bg-secondary/25 hover:border-secondary transition-all shadow-[0_4px_15px_rgba(230,33,23,0.18)] animate-pulse group cursor-pointer"
+      className="block w-full p-4 rounded-lg bg-secondary/15 border-2 border-secondary/40 hover:bg-secondary/25 hover:border-secondary transition-all shadow-[0_4px_15px_rgba(230,33,23,0.18)] group cursor-pointer"
     >
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-start gap-3">

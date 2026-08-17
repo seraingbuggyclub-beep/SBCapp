@@ -23,11 +23,11 @@ export default function MemberQrCodeCard({ member, className = '' }: MemberQrCod
   return (
     <>
       <div
-        className={`bg-surface/90 backdrop-blur-md border rounded-2xl p-5 relative overflow-hidden transition-all duration-300 shadow-[4px_4px_0px_#000] flex flex-col justify-between gap-4 ${theme.containerBorder} ${className}`}
+        className={`bg-surface border rounded-2xl p-5 relative overflow-hidden transition-all duration-300 shadow-[4px_4px_0px_#000] flex flex-col justify-between gap-4 ${theme.containerBorder} ${className}`}
       >
         {/* Glow background effect */}
         <div
-          className={`absolute -top-12 -right-12 w-32 h-32 rounded-full blur-3xl pointer-events-none ${
+          className={`absolute -top-12 -right-12 w-32 h-32 rounded-full blur-2xl pointer-events-none ${
             theme.isPaid ? 'bg-green-500/10' : 'bg-red-500/15'
           }`}
         />
@@ -120,11 +120,13 @@ export default function MemberQrCodeCard({ member, className = '' }: MemberQrCod
       </div>
 
       {/* Fullscreen Sun Mode Modal */}
-      <QrCodeModal
-        member={member}
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-      />
+      {modalOpen && (
+        <QrCodeModal
+          member={member}
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+        />
+      )}
     </>
   );
 }

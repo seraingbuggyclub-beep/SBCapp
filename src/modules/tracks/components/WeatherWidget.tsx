@@ -31,9 +31,9 @@ export default function WeatherWidget() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchWeather = async () => {
+  const fetchWeather = async (isBackground = false) => {
     try {
-      setLoading(true);
+      if (!isBackground) setLoading(true);
       setError(null);
 
       // Coordonnées GPS du complexe SBC à Seraing
@@ -65,14 +65,16 @@ export default function WeatherWidget() {
       console.error('Weather fetch error:', err);
       setError('Météo momentanément indisponible');
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchWeather();
-    // Rafraîchir toutes les 15 minutes
-    const interval = setInterval(fetchWeather, 15 * 60 * 1000);
+    fetchWeather(false);
+    // Rafraîchir toutes les 15 minutes en tâche de fond discrète
+    const interval = setInterval(() => {
+      fetchWeather(true);
+    }, 15 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -82,7 +84,7 @@ export default function WeatherWidget() {
       case 0:
         return {
           label: isDay ? 'Ensoleillé' : 'Nuit claire',
-          icon: <Sun className="w-6 h-6 text-amber-400 animate-[spin_20s_linear_infinite]" />,
+          icon: <Sun className="w-6 h-6 text-amber-400" />,
           bgColor: 'from-amber-500/10 to-transparent',
         };
       case 1:
@@ -142,7 +144,7 @@ export default function WeatherWidget() {
       case 99:
         return {
           label: 'Orage',
-          icon: <CloudLightning className="w-6 h-6 text-yellow-400 animate-pulse" />,
+          icon: <CloudLightning className="w-6 h-6 text-yellow-400" />,
           bgColor: 'from-yellow-500/15 to-transparent',
         };
       default:
@@ -156,9 +158,9 @@ export default function WeatherWidget() {
 
   if (loading && !weather) {
     return (
-      <div className="bg-surface/90 backdrop-blur-md border border-[#353535] rounded-xl p-4 flex items-center justify-between min-h-[96px] animate-pulse shadow-[3px_3px_0px_#000]">
+      <div className="bg-surface border border-[#353535] rounded-xl p-4 flex items-center justify-between min-h-[96px] shadow-[3px_3px_0px_#000]">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-surface-high animate-pulse" />
+          <div className="w-10 h-10 rounded-lg bg-surface-high" />
           <div className="space-y-2">
             <div className="h-4 w-24 bg-surface-high rounded" />
             <div className="h-3 w-16 bg-surface-high rounded" />
@@ -174,14 +176,14 @@ export default function WeatherWidget() {
 
   if (error || !weather) {
     return (
-      <div className="bg-surface/90 border border-[#353535] rounded-xl p-4 flex items-center justify-between shadow-[3px_3px_0px_#000]">
+      <div className="bg-surface border border-[#353535] rounded-xl p-4 flex items-center justify-between shadow-[3px_3px_0px_#000]">
         <div className="flex items-center gap-2 text-foreground/50 text-xs font-mono">
           <Thermometer className="w-4 h-4 text-primary" />
           <span>Seraing (Piste SBC) : Météo hors ligne</span>
         </div>
         <button
-          onClick={fetchWeather}
-          className="p-1.5 rounded bg-surface hover:bg-surface-high text-foreground/70 hover:text-white transition-colors"
+          onClick={() => fetchWeather(false)}
+          className="p-1.5 rounded bg-surface hover:bg-surface-high text-foreground/70 hover:text-white transition-colors cursor-pointer"
           title="Réessayer"
         >
           <RefreshCw className="w-3.5 h-3.5" />
@@ -193,7 +195,7 @@ export default function WeatherWidget() {
   const weatherInfo = getWeatherInfo(weather.weatherCode, weather.isDay);
 
   return (
-    <div className={`bg-linear-to-r ${weatherInfo.bgColor} bg-surface/90 backdrop-blur-md border border-[#353535] rounded-xl p-4 shadow-[4px_4px_0px_#000] relative overflow-hidden transition-all duration-300`}>
+    <div className={`bg-linear-to-r ${weatherInfo.bgColor} bg-surface border border-[#353535] rounded-xl p-4 shadow-[4px_4px_0px_#000] relative overflow-hidden transition-all duration-300`}>
       {/* Subtle top indicator */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         {/* Left: Weather condition and Location */}
@@ -244,7 +246,7 @@ export default function WeatherWidget() {
 
           {/* Bouton rafraîchir discret */}
           <button
-            onClick={fetchWeather}
+            onClick={() => fetchWeather(false)}
             disabled={loading}
             className="p-2 rounded-lg bg-background/60 hover:bg-surface-high border border-[#353535] text-foreground/40 hover:text-white transition-colors cursor-pointer"
             title={`Dernière mise à jour à ${weather.lastUpdated}`}

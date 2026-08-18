@@ -272,13 +272,13 @@ export default function AdminPage() {
       )}
 
       {/* Navigation par Onglets */}
-      <div className="flex items-center gap-2 border-b border-[#353535] pb-2 overflow-x-auto">
+      <div className="flex items-center gap-2 border-b border-[#353535] pb-2 overflow-x-auto scrollbar-none">
         <button
           onClick={() => setActiveTab('members')}
-          className={`px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
+          className={`h-10 px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer shrink-0 ${
             activeTab === 'members'
               ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
-              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white'
+              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
           }`}
         >
           <Users className="w-4 h-4" />
@@ -287,7 +287,7 @@ export default function AdminPage() {
 
         <button
           onClick={() => setActiveTab('blacklist')}
-          className={`px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
+          className={`h-10 px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer shrink-0 ${
             activeTab === 'blacklist'
               ? 'bg-secondary text-white shadow-[2px_2px_0px_#000]'
               : 'bg-surface border border-secondary/40 text-secondary hover:bg-secondary/20'
@@ -304,10 +304,10 @@ export default function AdminPage() {
 
         <button
           onClick={() => setActiveTab('treasury')}
-          className={`px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
+          className={`h-10 px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer shrink-0 ${
             activeTab === 'treasury'
               ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
-              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white'
+              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
           }`}
         >
           <Coins className="w-4 h-4" />
@@ -316,10 +316,10 @@ export default function AdminPage() {
 
         <button
           onClick={() => setActiveTab('tracks')}
-          className={`px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
+          className={`h-10 px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer shrink-0 ${
             activeTab === 'tracks'
               ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
-              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white'
+              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
           }`}
         >
           <Flag className="w-4 h-4" />
@@ -328,10 +328,10 @@ export default function AdminPage() {
 
         <button
           onClick={() => setActiveTab('communications')}
-          className={`px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
+          className={`h-10 px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer shrink-0 ${
             activeTab === 'communications'
               ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
-              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white'
+              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
           }`}
         >
           <Radio className="w-4 h-4" />
@@ -340,10 +340,10 @@ export default function AdminPage() {
 
         <button
           onClick={() => setActiveTab('permissions')}
-          className={`px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
+          className={`h-10 px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer shrink-0 ${
             activeTab === 'permissions'
               ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
-              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white'
+              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
           }`}
         >
           <Ghost className="w-4 h-4" />
@@ -352,10 +352,10 @@ export default function AdminPage() {
 
         <button
           onClick={() => setActiveTab('cadenas')}
-          className={`px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
+          className={`h-10 px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer shrink-0 ${
             activeTab === 'cadenas'
               ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
-              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white'
+              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
           }`}
         >
           <Key className="w-4 h-4" />
@@ -365,7 +365,7 @@ export default function AdminPage() {
         <button
           onClick={fetchAdminData}
           disabled={loading}
-          className="ml-auto p-2 bg-surface hover:bg-surface-high border border-[#353535] rounded text-foreground/60 hover:text-white cursor-pointer transition-colors disabled:opacity-40"
+          className="h-10 ml-auto p-2 bg-surface hover:bg-surface-high border border-[#353535] rounded text-foreground/60 hover:text-white cursor-pointer transition-colors disabled:opacity-40 shrink-0"
           title="Actualiser les données"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />

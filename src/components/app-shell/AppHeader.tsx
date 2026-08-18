@@ -107,21 +107,6 @@ export default function AppHeader() {
                 </button>
               )}
 
-              {/* Statut Cotisation Badge */}
-              {effectiveProfile && (
-                <span
-                  className={`hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border ${
-                    effectiveProfile.payment_status === 'paid' || effectiveProfile.role === 'admin'
-                      ? 'bg-success/15 border-success/30 text-success'
-                      : effectiveProfile.payment_status === 'expired'
-                      ? 'bg-secondary/15 border-secondary/30 text-secondary'
-                      : 'bg-yellow-500/15 border-yellow-500/30 text-yellow-400'
-                  }`}
-                >
-                  {effectiveProfile.payment_status === 'paid' || effectiveProfile.role === 'admin' ? 'Cotisation OK' : 'En attente'}
-                </span>
-              )}
-
               <Link
                 href="/dashboard"
                 className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded bg-surface border border-[#353535] hover:border-primary text-xs font-mono text-white transition-colors"

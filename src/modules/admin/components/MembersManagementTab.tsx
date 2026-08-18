@@ -123,6 +123,18 @@ export default function MembersManagementTab({
     }
   };
 
+  const formatLicenseBadge = (license?: string | null) => {
+    if (!license) return '';
+    const trimmed = license.trim();
+    const upper = trimmed.toUpperCase();
+    if (upper === 'FBA-VISITOR') return 'SBC-VISITOR';
+    if (upper === 'FBA-MEMBER') return 'SBC-MEMBER';
+    if (upper === 'FBA-DAILY') return 'SBC-DAILY';
+    if (upper === 'FBA-ADMIN-SEC' || upper === 'FBA-REFERENT') return 'SBC-REFERENT';
+    if (upper.startsWith('FBA-')) return `SBC-${trimmed.substring(4)}`;
+    return license;
+  };
+
   const handleOpenBlacklistModal = (member: MemberProfile) => {
     setBlacklistModalMember(member);
     setInternalReason('');
@@ -271,11 +283,11 @@ export default function MembersManagementTab({
                       </div>
                     </td>
 
-                    {/* Licence FBA */}
+                    {/* Licence */}
                     <td className="px-5 py-3.5">
                       {member.license_number ? (
                         <span className="font-bold text-white bg-surface px-2 py-0.5 rounded border border-[#353535] text-[11px]">
-                          {member.license_number}
+                          {formatLicenseBadge(member.license_number)}
                         </span>
                       ) : (
                         <span className="text-foreground/30 italic text-[11px]">Aucune</span>
@@ -534,7 +546,7 @@ export default function MembersManagementTab({
               <div className="space-y-2 p-4 rounded-xl bg-surface/30 border border-[#353535]">
                 <div className="flex items-center gap-2 text-foreground/70">
                   <Hash className="w-3.5 h-3.5 text-primary shrink-0" />
-                  <span>Licence FBA : <strong className="text-white">{selectedMember.license_number || 'Non renseigné'}</strong></span>
+                  <span>Licence : <strong className="text-white">{formatLicenseBadge(selectedMember.license_number) || 'Non renseigné'}</strong></span>
                 </div>
                 <div className="flex items-center gap-2 text-foreground/70">
                   <Phone className="w-3.5 h-3.5 text-primary shrink-0" />

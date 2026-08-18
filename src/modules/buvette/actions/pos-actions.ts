@@ -9,7 +9,7 @@ import { assertReferentOrAdmin } from '@/lib/auth/assert-role';
  * Crée et encaisse une commande sur le POS tactile
  */
 export async function createPosOrder(input: {
-  sessionId: string;
+  sessionId?: string | null;
   buyerId?: string | null;
   items: { itemId: string; quantity: number }[];
   paymentMethod: BarPaymentMethod;

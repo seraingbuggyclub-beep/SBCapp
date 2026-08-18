@@ -366,10 +366,12 @@ export interface BarSession {
   opened_by: string;
   opened_at: string;
   opening_cash: number;
+  opening_breakdown?: Record<string, number> | null;
   closed_by?: string | null;
   closed_at?: string | null;
   closing_cash_counted?: number | null;
   closing_cash_expected?: number | null;
+  closing_breakdown?: Record<string, number> | null;
   cash_difference?: number | null;
   status: 'OPEN' | 'CLOSED';
   notes?: string | null;

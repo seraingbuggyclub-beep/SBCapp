@@ -14,6 +14,7 @@ import {
   getActiveBarSession,
   openBarSession,
   createPosOrder,
+  getMembersBalancesList,
 } from '../actions';
 import dynamic from 'next/dynamic';
 
@@ -21,6 +22,8 @@ const BarQrScannerModal = dynamic(() => import('./BarQrScannerModal'), {
   ssr: false,
 });
 import BarCashRegisterCloseModal from './BarCashRegisterCloseModal';
+import BarCashRegisterOpenModal from './BarCashRegisterOpenModal';
+import CashCounterGrid from './CashCounterGrid';
 import {
   Plus,
   Minus,
@@ -57,11 +60,13 @@ export default function BarPosTerminal() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedBuyer, setSelectedBuyer] = useState<MemberBalanceItem | null>(null);
 
-  // Modals State
-  const [openingCashInput, setOpeningCashInput] = useState<string>('50');
-  const [openingNotes, setOpeningNotes] = useState<string>('');
-  const [openingLoading, setOpeningLoading] = useState(false);
+  // Member Search State
+  const [membersList, setMembersList] = useState<MemberBalanceItem[]>([]);
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [isMemberDropdownOpen, setIsMemberDropdownOpen] = useState(false);
 
+  // Modals State
+  const [openRegisterModalOpen, setOpenRegisterModalOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [closeRegisterOpen, setCloseRegisterOpen] = useState(false);
 
@@ -79,19 +84,34 @@ export default function BarPosTerminal() {
   // Chargement des données
   const loadPosData = useCallback(async () => {
     setLoading(true);
-    const [catRes, sessRes] = await Promise.all([
+    const [catRes, sessRes, membersRes] = await Promise.all([
       getBarCatalogue(),
       getActiveBarSession(),
+      getMembersBalancesList(),
     ]);
 
     setCategories(catRes.data || []);
     setSession(sessRes.session);
+    setMembersList(membersRes.data || []);
     setLoading(false);
   }, []);
 
   useEffect(() => {
     loadPosData();
   }, [loadPosData]);
+
+  // Filtrage des membres pour autocomplétion
+  const filteredMembers = useMemo(() => {
+    if (!memberSearchQuery.trim()) return membersList.slice(0, 10);
+    const q = memberSearchQuery.toLowerCase().trim();
+    return membersList.filter(
+      (m) =>
+        m.first_name.toLowerCase().includes(q) ||
+        m.last_name.toLowerCase().includes(q) ||
+        m.email.toLowerCase().includes(q) ||
+        (m.phone && m.phone.includes(q))
+    ).slice(0, 12);
+  }, [membersList, memberSearchQuery]);
 
   // Total panier
   const cartTotal = useMemo(() => {
@@ -141,30 +161,8 @@ export default function BarPosTerminal() {
     setCashReceived('');
   };
 
-  // Ouverture de session
-  const handleOpenSession = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setOpeningLoading(true);
-    setMsg(null);
-
-    const res = await openBarSession(Number(openingCashInput || 0), openingNotes);
-    setOpeningLoading(false);
-
-    if (res.success && res.session) {
-      setSession(res.session);
-      setMsg({ text: 'Session de caisse ouverte avec succès !', type: 'success' });
-      loadPosData();
-    } else {
-      setMsg({ text: res.error || "Erreur lors de l'ouverture", type: 'error' });
-    }
-  };
-
   // Exécution du paiement
   const handleCheckout = async (paymentMethod: BarPaymentMethod) => {
-    if (!session) {
-      setMsg({ text: 'Aucune session de caisse active.', type: 'error' });
-      return;
-    }
     if (cart.length === 0) {
       setMsg({ text: 'Le panier est vide.', type: 'error' });
       return;
@@ -184,7 +182,7 @@ export default function BarPosTerminal() {
     setMsg(null);
 
     const res = await createPosOrder({
-      sessionId: session.id,
+      sessionId: session?.id || null,
       buyerId: selectedBuyer?.id || null,
       items: cart.map((c) => ({ itemId: c.item.id, quantity: c.quantity })),
       paymentMethod,
@@ -226,110 +224,56 @@ export default function BarPosTerminal() {
     );
   }
 
-  // ÉCRAN 1 : OUVERTURE DE CAISSE
-  if (!session) {
-    return (
-      <div className="max-w-xl mx-auto p-6 bg-surface border border-[#353535] rounded-2xl space-y-6 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
-        <div className="flex items-center gap-3 border-b border-[#353535] pb-4">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center text-primary">
-            <Coins className="w-5 h-5" />
-          </div>
-          <div>
-            <h2 className="font-anybody font-black text-xl uppercase tracking-tight text-white sport-skew">
-              Ouverture de Caisse Buvette
-            </h2>
-            <p className="text-xs font-mono text-foreground/50">
-              Seraing Buggy Club • Session Événementielle / Entraînement
-            </p>
-          </div>
-        </div>
-
-        {msg && (
-          <div className="p-3.5 rounded-xl bg-secondary/15 border border-secondary/40 text-secondary text-xs font-mono flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{msg.text}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleOpenSession} className="space-y-4 font-mono text-xs">
-          <div className="space-y-2">
-            <label className="block text-white font-bold uppercase tracking-wider">
-              Fond de Caisse Initial en Espèces (€) *
-            </label>
-            <div className="relative">
-              <input
-                type="number"
-                step="0.50"
-                min="0"
-                value={openingCashInput}
-                onChange={(e) => setOpeningCashInput(e.target.value)}
-                placeholder="50.00"
-                className="w-full bg-background border border-[#353535] rounded-xl px-4 py-3 text-xl font-bold font-mono text-primary focus:outline-none focus:border-primary"
-                required
-              />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground/40 font-bold">
-                EUR
-              </span>
-            </div>
-            <p className="text-[11px] text-foreground/50">
-              Montant en pièces et billets déjà présent dans le tiroir caisse à l'ouverture.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <label className="block text-foreground/70">Remarques ou Nom de l'événement (optionnel) :</label>
-            <input
-              type="text"
-              value={openingNotes}
-              onChange={(e) => setOpeningNotes(e.target.value)}
-              placeholder="Ex: Manche Championnat SBC, Entraînement libre du samedi..."
-              className="w-full bg-background border border-[#353535] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={openingLoading || !openingCashInput}
-            className="w-full premium-btn text-sm py-3 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-          >
-            <Unlock className="w-4 h-4" />
-            <span className="transform skew-x-8">
-              {openingLoading ? 'Ouverture...' : 'Ouvrir la Caisse & Démarrer le POS'}
-            </span>
-          </button>
-        </form>
-      </div>
-    );
-  }
-
-  // ÉCRAN 2 : POS TACTILE COMPLET
+  // POS TACTILE COMPLET (ACCÈS DIRECT SANS BLOCAGE DE FOND DE CAISSE)
   return (
     <div className="space-y-4">
       {/* Top Bar Session Info */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-surface p-3.5 rounded-xl border border-[#353535]">
-        <div className="flex items-center gap-2.5 font-mono text-xs">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/15 border border-green-500/30 text-green-400 font-bold uppercase tracking-wider text-[10px]">
-            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            Caisse Ouverte
-          </span>
-          <span className="text-foreground/50">•</span>
-          <span className="text-foreground/70">
-            Fond : <strong className="text-white">{session.opening_cash.toFixed(2)} €</strong>
-          </span>
-          <span className="text-foreground/50">•</span>
-          <span className="text-foreground/70">
-            Par : <strong className="text-white">{session.opened_by_member?.first_name} {session.opened_by_member?.last_name}</strong>
-          </span>
-        </div>
+        {session ? (
+          <div className="flex flex-wrap items-center gap-2.5 font-mono text-xs">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/15 border border-green-500/30 text-green-400 font-bold uppercase tracking-wider text-[10px]">
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              Session Espèces Active
+            </span>
+            <span className="text-foreground/50">•</span>
+            <span className="text-foreground/70">
+              Fond : <strong className="text-white">{session.opening_cash.toFixed(2)} €</strong>
+            </span>
+            <span className="text-foreground/50">•</span>
+            <span className="text-foreground/70">
+              Par : <strong className="text-white">{session.opened_by_member?.first_name} {session.opened_by_member?.last_name}</strong>
+            </span>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2.5 font-mono text-xs">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 font-bold uppercase tracking-wider text-[10px]">
+              <Wallet className="w-3 h-3" />
+              Mode Débit Compte / Dématérialisé
+            </span>
+            <span className="text-foreground/50 text-[11px] hidden sm:inline">
+              (Débit immédiat portefeuille / ardoise / Payconiq)
+            </span>
+          </div>
+        )}
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCloseRegisterOpen(true)}
-            className="px-3.5 py-1.5 rounded-lg bg-secondary/15 hover:bg-secondary/30 border border-secondary/40 text-secondary text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
-          >
-            <Lock className="w-3.5 h-3.5" />
-            <span>Fermer Caisse (Z)</span>
-          </button>
+          {session ? (
+            <button
+              onClick={() => setCloseRegisterOpen(true)}
+              className="px-3.5 py-1.5 rounded-lg bg-secondary/15 hover:bg-secondary/30 border border-secondary/40 text-secondary text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Fermer Caisse (Z)</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setOpenRegisterModalOpen(true)}
+              className="px-3.5 py-1.5 rounded-lg bg-surface-high hover:bg-surface-dim border border-[#353535] hover:border-primary text-foreground/80 hover:text-white text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Coins className="w-3.5 h-3.5 text-primary" />
+              <span>Préparer / Ouvrir le fond de caisse</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -448,49 +392,154 @@ export default function BarPosTerminal() {
               )}
             </div>
 
-            {/* Sélecteur Client / Membre */}
-            <div className="p-2.5 rounded-xl bg-background border border-[#353535] flex items-center justify-between gap-2 font-mono text-xs">
-              {selectedBuyer ? (
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-primary">
-                      <User className="w-3.5 h-3.5" />
-                    </div>
-                    <div>
-                      <strong className="text-white block text-xs">
+            {/* Sélecteur Client / Membre Autocomplété */}
+            {selectedBuyer ? (
+              <div className="p-2.5 rounded-xl bg-background border border-primary/40 shadow-[0_0_15px_rgba(255,110,0,0.1)] flex items-center justify-between gap-2 font-mono text-xs animate-fade-in">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center text-primary shrink-0">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <strong className="text-white text-xs truncate">
                         {selectedBuyer.first_name} {selectedBuyer.last_name}
                       </strong>
-                      <div className="text-[10px] text-foreground/50 flex gap-2">
-                        <span>Solde : <strong className="text-primary">{selectedBuyer.wallet_balance.toFixed(2)} €</strong></span>
-                        {selectedBuyer.tab_balance > 0 && (
-                          <span className="text-yellow-400">Ardoise : {selectedBuyer.tab_balance.toFixed(2)} €</span>
-                        )}
-                      </div>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-primary/20 text-primary font-bold">
+                        Solde : {selectedBuyer.wallet_balance.toFixed(2)} €
+                      </span>
                     </div>
+                    {selectedBuyer.tab_balance > 0 && (
+                      <span className="text-[10px] text-yellow-400 font-bold block mt-0.5">
+                        Ardoise : {selectedBuyer.tab_balance.toFixed(2)} €
+                      </span>
+                    )}
                   </div>
-
-                  <button
-                    onClick={() => setSelectedBuyer(null)}
-                    className="p-1 text-foreground/40 hover:text-white"
-                    title="Désélectionner"
-                  >
-                    ×
-                  </button>
                 </div>
-              ) : (
-                <div className="flex items-center justify-between w-full">
-                  <span className="text-foreground/50 text-[11px]">Client : Anonyme / Visiteur</span>
+
+                <div className="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
                     onClick={() => setScannerOpen(true)}
-                    className="px-2.5 py-1 rounded bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg bg-surface hover:bg-surface-high border border-[#353535] text-primary hover:text-white transition-colors cursor-pointer"
+                    title="Changer par scan QR Code"
                   >
-                    <QrCode className="w-3 h-3" />
-                    <span>Scanner Pass</span>
+                    <QrCode className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedBuyer(null);
+                      setMemberSearchQuery('');
+                    }}
+                    className="p-1.5 rounded-lg bg-secondary/15 hover:bg-secondary/30 border border-secondary/30 text-secondary hover:text-white transition-colors cursor-pointer"
+                    title="Désélectionner (Revenir en Anonyme)"
+                  >
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="relative font-mono text-xs">
+                <div className="flex items-center gap-2">
+                  {/* Champ de recherche */}
+                  <div className="relative flex-1">
+                    <Search className="w-3.5 h-3.5 text-foreground/40 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={memberSearchQuery}
+                      onChange={(e) => {
+                        setMemberSearchQuery(e.target.value);
+                        setIsMemberDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsMemberDropdownOpen(true)}
+                      placeholder="Rechercher pilote (nom, prénom...)"
+                      className="w-full bg-background border border-[#353535] focus:border-primary rounded-xl pl-8.5 pr-8 py-2 text-xs text-white placeholder-foreground/40 focus:outline-none transition-colors"
+                    />
+                    {memberSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMemberSearchQuery('');
+                          setIsMemberDropdownOpen(false);
+                        }}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-white p-0.5"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Bouton Scanner Pass */}
+                  <button
+                    type="button"
+                    onClick={() => setScannerOpen(true)}
+                    className="px-3 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                    title="Scanner le QR Code membre"
+                  >
+                    <QrCode className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Scanner</span>
+                  </button>
+                </div>
+
+                {/* Dropdown autocomplétion */}
+                {isMemberDropdownOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-20"
+                      onClick={() => setIsMemberDropdownOpen(false)}
+                    />
+                    <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-[#161616] border border-[#353535] rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] overflow-hidden max-h-56 overflow-y-auto animate-fade-in divide-y divide-[#252525]">
+                      {filteredMembers.length === 0 ? (
+                        <div className="p-3 text-center text-foreground/40 text-[11px]">
+                          Aucun pilote trouvé
+                        </div>
+                      ) : (
+                        filteredMembers.map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedBuyer(m);
+                              setIsMemberDropdownOpen(false);
+                              setMemberSearchQuery('');
+                              setMsg({ text: `Pilote sélectionné : ${m.first_name} ${m.last_name}`, type: 'success' });
+                            }}
+                            className="w-full p-2.5 text-left hover:bg-surface flex items-center justify-between gap-2 transition-colors cursor-pointer"
+                          >
+                            <div className="min-w-0">
+                              <strong className="text-white block text-xs truncate">
+                                {m.first_name} {m.last_name}
+                              </strong>
+                              <span className="text-[10px] text-foreground/45 block truncate">{m.email}</span>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span
+                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                  m.wallet_balance < 0
+                                    ? 'bg-rose-500/15 text-rose-400'
+                                    : m.wallet_balance > 0
+                                    ? 'bg-emerald-500/15 text-emerald-400'
+                                    : 'bg-surface text-foreground/50'
+                                }`}
+                              >
+                                {m.wallet_balance < 0
+                                  ? `-${Math.abs(m.wallet_balance).toFixed(2)} €`
+                                  : `+${m.wallet_balance.toFixed(2)} €`}
+                              </span>
+                              {m.tab_balance > 0 && (
+                                <span className="text-[9px] text-yellow-400 block mt-0.5">
+                                  Ardoise: {m.tab_balance.toFixed(2)} €
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Lignes du panier */}
@@ -772,6 +821,22 @@ export default function BarPosTerminal() {
           onMemberSelected={(member) => {
             setSelectedBuyer(member);
             setMsg({ text: `Membre identifié : ${member.first_name} ${member.last_name}`, type: 'success' });
+          }}
+        />
+      )}
+
+      {/* PREPARATION & OPENING CASH SESSION MODAL */}
+      {openRegisterModalOpen && (
+        <BarCashRegisterOpenModal
+          isOpen={openRegisterModalOpen}
+          onClose={() => setOpenRegisterModalOpen(false)}
+          onSessionOpened={(newSession) => {
+            setSession(newSession);
+            loadPosData();
+            setMsg({
+              text: `Session espèces activée avec ${newSession.opening_cash.toFixed(2)} € de fond de caisse !`,
+              type: 'success',
+            });
           }}
         />
       )}

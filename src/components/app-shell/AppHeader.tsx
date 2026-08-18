@@ -9,11 +9,20 @@ import { LogOut, User, Key, Menu, X, Shield, Radio, Trophy, LayoutDashboard, QrC
 import { useRouter, usePathname } from 'next/navigation';
 import QrCodeModal from '@/modules/members/components/QrCodeModal';
 
+import { isSuperAdmin } from '@/modules/admin/permissions';
+
 export default function AppHeader() {
   const { user, profile, isAdmin, signOut } = useAuth();
   const { simulatedProfile, isSimulationActive } = useSimulation();
   const effectiveProfile = simulatedProfile || profile;
   const { hasUnreadBrief, markAsRead } = useUnreadBrief();
+
+  const isSuper = isSuperAdmin(effectiveProfile ? effectiveProfile.email : (user ? user.email : null));
+  const isClubAdmin = Boolean(isAdmin || isSuper || effectiveProfile?.role === 'admin');
+  const canManageBar = Boolean(
+    isClubAdmin ||
+    (effectiveProfile?.role === 'referent' && effectiveProfile?.referent_permissions?.can_manage_bar)
+  );
 
   const [isOpen, setIsOpen] = useState(false);
   const [headerQrOpen, setHeaderQrOpen] = useState(false);
@@ -35,7 +44,7 @@ export default function AppHeader() {
     { href: '/', label: 'Accueil' },
     { href: '/events', label: 'Courses & Calendrier' },
     { href: '/check-in', label: 'Check-in Piste' },
-    { href: '/buvette/self-service', label: 'Buvette' },
+    ...(canManageBar ? [{ href: '/buvette', label: 'Buvette' }] : []),
     { href: '/dashboard', label: 'Espace Pilote' },
     { href: '/pit-lane', label: 'Pit-Lane' },
   ];

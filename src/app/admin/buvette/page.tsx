@@ -8,6 +8,7 @@ import BarPosTerminal from '@/modules/buvette/components/BarPosTerminal';
 import BarStockManager from '@/modules/buvette/components/BarStockManager';
 import BarAccountsManager from '@/modules/buvette/components/BarAccountsManager';
 import WorkSessionBarTerminal from '@/modules/work-sessions/components/WorkSessionBarTerminal';
+import BarCashRegisterOpenModal from '@/modules/buvette/components/BarCashRegisterOpenModal';
 import {
   Coffee,
   Boxes,
@@ -20,12 +21,13 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-type BuvetteTab = 'pos' | 'stocks' | 'accounts' | 'volunteers';
+type BuvetteTab = 'stocks' | 'accounts' | 'volunteers';
 
 export default function AdminBuvettePage() {
   const { user, profile } = useAuth();
   const permissions = usePermissions(profile);
-  const [activeTab, setActiveTab] = useState<BuvetteTab>('pos');
+  const [activeTab, setActiveTab] = useState<BuvetteTab>('stocks');
+  const [openCashModalOpen, setOpenCashModalOpen] = useState(false);
 
   if (!user || (!permissions.isAdmin && !permissions.isSuperAdmin)) {
     return (
@@ -35,7 +37,7 @@ export default function AdminBuvettePage() {
           Accès Restreint
         </h2>
         <p className="text-foreground/60">
-          La gestion de la buvette et du terminal POS est réservée aux administrateurs du Seraing Buggy Club.
+          La gestion de la buvette est réservée aux administrateurs du Seraing Buggy Club.
         </p>
         <Link
           href="/dashboard"
@@ -64,72 +66,84 @@ export default function AdminBuvettePage() {
             <div className="flex items-center gap-2">
               <Coffee className="w-5 h-5 text-primary" />
               <h1 className="font-anybody font-black text-xl sm:text-2xl uppercase tracking-tight text-white sport-skew">
-                Buvette, Caisse POS & Stocks <span className="text-primary">SBC</span>
+                Back-office Buvette & Stocks <span className="text-primary">SBC</span>
               </h1>
             </div>
             <p className="text-xs font-mono text-foreground/50">
-              Terminal point de vente tactile, inventaire, réapprovisionnement et suivi des ardoises.
+              Gestion du catalogue, approvisionnements, validation des virements et packs bénévoles.
             </p>
           </div>
         </div>
 
-        {/* Navigation Onglets */}
-        <div className="flex items-center gap-2 overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('pos')}
-            className={`px-4 py-2 rounded-lg font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
-              activeTab === 'pos'
-                ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
-                : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white'
-            }`}
+        {/* Bouton Caisse Direct + Préparation Fond + Navigation Onglets */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/buvette"
+            className="px-4 py-2 rounded-lg bg-primary text-black font-anybody font-black text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 shadow-[2px_2px_0px_#000] hover:bg-secondary hover:text-white"
           >
             <Coins className="w-4 h-4" />
-            <span className="transform skew-x-8">Caisse POS Tactile</span>
-          </button>
+            <span className="transform skew-x-8">Ouvrir la Caisse POS</span>
+          </Link>
 
           <button
-            onClick={() => setActiveTab('volunteers')}
-            className={`px-4 py-2 rounded-lg font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
-              activeTab === 'volunteers'
-                ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
-                : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white'
-            }`}
+            type="button"
+            onClick={() => setOpenCashModalOpen(true)}
+            className="px-3.5 py-2 rounded-lg bg-surface-high hover:bg-surface-dim border border-[#353535] hover:border-primary text-foreground/80 hover:text-white text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
           >
-            <Wrench className="w-4 h-4" />
-            <span className="transform skew-x-8">Packs Bénévoles</span>
+            <Coins className="w-4 h-4 text-primary" />
+            <span>Préparer / Ouvrir le fond de caisse</span>
           </button>
 
           <button
             onClick={() => setActiveTab('stocks')}
             className={`px-4 py-2 rounded-lg font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
               activeTab === 'stocks'
-                ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
+                ? 'bg-white text-black shadow-[2px_2px_0px_#000]'
                 : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white'
             }`}
           >
             <Boxes className="w-4 h-4" />
-            <span className="transform skew-x-8">Stocks & Achats</span>
+            <span className="transform skew-x-8">Stocks & Tarifs</span>
           </button>
 
           <button
             onClick={() => setActiveTab('accounts')}
             className={`px-4 py-2 rounded-lg font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
               activeTab === 'accounts'
-                ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
+                ? 'bg-white text-black shadow-[2px_2px_0px_#000]'
                 : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white'
             }`}
           >
             <Wallet className="w-4 h-4" />
-            <span className="transform skew-x-8">Comptes & Ardoises</span>
+            <span className="transform skew-x-8">Comptes & Virements</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('volunteers')}
+            className={`px-4 py-2 rounded-lg font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
+              activeTab === 'volunteers'
+                ? 'bg-white text-black shadow-[2px_2px_0px_#000]'
+                : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white'
+            }`}
+          >
+            <Wrench className="w-4 h-4" />
+            <span className="transform skew-x-8">Packs Bénévoles</span>
           </button>
         </div>
       </div>
 
       {/* Contenu Onglet Actif */}
-      {activeTab === 'pos' && <BarPosTerminal />}
-      {activeTab === 'volunteers' && <WorkSessionBarTerminal />}
       {activeTab === 'stocks' && <BarStockManager />}
       {activeTab === 'accounts' && <BarAccountsManager />}
+      {activeTab === 'volunteers' && <WorkSessionBarTerminal />}
+
+      {/* Modale de Préparation / Ouverture Fond de Caisse */}
+      {openCashModalOpen && (
+        <BarCashRegisterOpenModal
+          isOpen={openCashModalOpen}
+          onClose={() => setOpenCashModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

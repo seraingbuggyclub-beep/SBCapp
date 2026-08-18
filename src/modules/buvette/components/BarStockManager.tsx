@@ -11,6 +11,7 @@ import {
   adjustBarInventory,
   getBarShoppingList,
   upsertBarItem,
+  deleteBarItem,
 } from '../actions';
 import {
   Package,
@@ -25,6 +26,7 @@ import {
   Euro,
   RefreshCw,
   Edit2,
+  Trash2,
   Save,
   X,
   Tag,
@@ -33,6 +35,8 @@ import {
   Layers,
   ArrowDownCircle,
 } from 'lucide-react';
+
+const PRESET_CATEGORIES = ['Boissons', 'Snacks', 'Restauration', 'Divers'];
 
 export default function BarStockManager() {
   const [activeTab, setActiveTab] = useState<'stocks' | 'entry' | 'inventory' | 'shopping'>('stocks');
@@ -60,7 +64,11 @@ export default function BarStockManager() {
   // Modal Édition / Nouvel article
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Partial<BarItem> | null>(null);
+  const [categorySelection, setCategorySelection] = useState<string>('Boissons');
+  const [customCategoryInput, setCustomCategoryInput] = useState<string>('');
+  const [isCustomMode, setIsCustomMode] = useState<boolean>(false);
   const [editLoading, setEditLoading] = useState(false);
+  const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null);
 
   // Checklist courses
   const [checkedItems, setCheckedItems] = useState<{ [itemId: string]: boolean }>({});
@@ -165,13 +173,120 @@ export default function BarStockManager() {
     }
   };
 
+  // Helper anti-UUID
+  const isValidCategoryName = useCallback((name?: string | null) => {
+    if (!name || !name.trim()) return false;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{8}-[0-9a-f]{12}$/i.test(name.trim());
+    return !isUuid;
+  }, []);
+
+  // Catégories combinées pour le sélecteur (Uniquement des noms lisibles)
+  const availableCategoryNames = useMemo(() => {
+    const list: string[] = [];
+    const addedNames = new Set<string>();
+
+    // 1. Presets d'abord
+    PRESET_CATEGORIES.forEach((name) => {
+      list.push(name);
+      addedNames.add(name.toLowerCase());
+    });
+
+    // 2. Catégories DB additionnelles valides
+    categories.forEach((cat) => {
+      const trimmed = cat.name?.trim();
+      if (isValidCategoryName(trimmed) && !addedNames.has(trimmed.toLowerCase())) {
+        list.push(trimmed);
+        addedNames.add(trimmed.toLowerCase());
+      }
+    });
+
+    return list;
+  }, [categories, isValidCategoryName]);
+
+  const handleOpenNewItemModal = () => {
+    setEditingItem({
+      category_id: '',
+      name: '',
+      selling_price: 2.0,
+      cost_price: 0.65,
+      stock_quantity: 24,
+      alert_threshold: 10,
+      is_active: true,
+    });
+    setCategorySelection('Boissons');
+    setCustomCategoryInput('');
+    setIsCustomMode(false);
+    setEditModalOpen(true);
+  };
+
+  const handleOpenEditItemModal = (item: BarItem) => {
+    setEditingItem(item);
+    const dbCat = categories.find((c) => c.id === item.category_id);
+    const catName = dbCat?.name || item.category?.name;
+
+    if (catName && isValidCategoryName(catName)) {
+      setCategorySelection(catName);
+      setIsCustomMode(false);
+    } else {
+      setCategorySelection('Boissons');
+      setIsCustomMode(false);
+    }
+    setCustomCategoryInput('');
+    setEditModalOpen(true);
+  };
+
+  // Suppression d'un article
+  const handleDeleteItem = async (itemId: string, itemName: string) => {
+    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer définitivement l'article "${itemName}" ?`)) {
+      return;
+    }
+
+    setDeleteLoadingId(itemId);
+    const res = await deleteBarItem(itemId);
+    setDeleteLoadingId(null);
+
+    if (res.success) {
+      setMsg({ text: `Article "${itemName}" supprimé avec succès !`, type: 'success' });
+      if (editingItem?.id === itemId) {
+        setEditModalOpen(false);
+        setEditingItem(null);
+      }
+      loadData();
+    } else {
+      setMsg({ text: res.error || "Erreur lors de la suppression de l'article", type: 'error' });
+    }
+  };
+
   // Soumission Nouvel / Édition article
   const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingItem?.name || !editingItem.category_id) return;
+    if (!editingItem?.name) return;
+
+    const targetCategoryName = isCustomMode
+      ? customCategoryInput.trim()
+      : categorySelection.trim();
+
+    if (!targetCategoryName) {
+      setMsg({ text: 'Veuillez sélectionner ou saisir une catégorie.', type: 'error' });
+      return;
+    }
+
+    if (!isValidCategoryName(targetCategoryName)) {
+      setMsg({ text: 'Le nom de la catégorie est invalide.', type: 'error' });
+      return;
+    }
+
+    // Vérifier si cette catégorie existe déjà en base pour associer son ID
+    const existingCat = categories.find(
+      (c) => c.name.trim().toLowerCase() === targetCategoryName.toLowerCase()
+    );
 
     setEditLoading(true);
-    const res = await upsertBarItem(editingItem);
+    const res = await upsertBarItem({
+      ...editingItem,
+      category_id: existingCat ? existingCat.id : undefined,
+      category_name: existingCat ? undefined : targetCategoryName,
+    });
     setEditLoading(false);
 
     if (res.success) {
@@ -246,18 +361,7 @@ export default function BarStockManager() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              setEditingItem({
-                category_id: categories[0]?.id || '',
-                name: '',
-                selling_price: 2.0,
-                cost_price: 0.65,
-                stock_quantity: 24,
-                alert_threshold: 10,
-                is_active: true,
-              });
-              setEditModalOpen(true);
-            }}
+            onClick={handleOpenNewItemModal}
             className="px-3 py-2 rounded-lg bg-surface hover:bg-surface-high border border-primary/40 text-primary text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -385,16 +489,23 @@ export default function BarStockManager() {
                           {item.alert_threshold}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => {
-                              setEditingItem(item);
-                              setEditModalOpen(true);
-                            }}
-                            className="p-1.5 rounded bg-surface hover:bg-surface-high border border-[#353535] text-foreground/60 hover:text-white cursor-pointer"
-                            title="Modifier"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleOpenEditItemModal(item)}
+                              className="p-1.5 rounded bg-surface hover:bg-surface-high border border-[#353535] text-foreground/60 hover:text-white transition-colors cursor-pointer"
+                              title="Modifier"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteItem(item.id, item.name)}
+                              disabled={deleteLoadingId === item.id}
+                              className="p-1.5 rounded bg-surface hover:bg-red-950/40 border border-[#353535] hover:border-red-500/40 text-foreground/60 hover:text-red-400 transition-colors cursor-pointer disabled:opacity-50"
+                              title="Supprimer l'article"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -665,18 +776,100 @@ export default function BarStockManager() {
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-foreground/70 block">Catégorie * :</label>
-              <select
-                value={editingItem.category_id || ''}
-                onChange={(e) => setEditingItem({ ...editingItem, category_id: e.target.value })}
-                className="w-full bg-surface border border-[#353535] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-primary cursor-pointer font-sans"
-                required
-              >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-foreground/70 block">Catégorie * :</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !isCustomMode;
+                    setIsCustomMode(next);
+                    if (next) setCustomCategoryInput('');
+                  }}
+                  className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer font-sans"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>{isCustomMode ? 'Choisir dans la liste' : 'Nouvelle catégorie'}</span>
+                </button>
+              </div>
+
+              {/* Raccourcis rapides catégories prédéfinies */}
+              <div className="flex flex-wrap gap-1.5">
+                {PRESET_CATEGORIES.map((presetName) => {
+                  const isSelected =
+                    !isCustomMode &&
+                    categorySelection.toLowerCase() === presetName.toLowerCase();
+
+                  return (
+                    <button
+                      key={presetName}
+                      type="button"
+                      onClick={() => {
+                        setIsCustomMode(false);
+                        setCategorySelection(presetName);
+                      }}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-sans font-medium transition-colors cursor-pointer border ${
+                        isSelected
+                          ? 'bg-primary text-black border-primary font-bold shadow-[0_0_10px_rgba(255,215,0,0.3)]'
+                          : 'bg-surface hover:bg-surface-high border-[#353535] text-foreground/70 hover:text-white'
+                      }`}
+                    >
+                      {presetName}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {!isCustomMode ? (
+                <select
+                  value={categorySelection}
+                  onChange={(e) => {
+                    if (e.target.value === '__custom__') {
+                      setIsCustomMode(true);
+                      setCustomCategoryInput('');
+                    } else {
+                      setCategorySelection(e.target.value);
+                    }
+                  }}
+                  className="w-full bg-surface border border-[#353535] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-primary cursor-pointer font-sans text-xs"
+                  required
+                >
+                  <optgroup label="Catégories par défaut">
+                    {PRESET_CATEGORIES.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </optgroup>
+                  {availableCategoryNames.filter((name) => !PRESET_CATEGORIES.includes(name)).length > 0 && (
+                    <optgroup label="Autres catégories existantes">
+                      {availableCategoryNames
+                        .filter((name) => !PRESET_CATEGORIES.includes(name))
+                        .map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                    </optgroup>
+                  )}
+                  <option value="__custom__">➕ Saisie personnalisée...</option>
+                </select>
+              ) : (
+                <div className="space-y-1">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={customCategoryInput}
+                    onChange={(e) => setCustomCategoryInput(e.target.value)}
+                    placeholder="Ex: Goodies, Vêtements..."
+                    className="w-full bg-surface border border-primary/60 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-primary font-sans text-xs"
+                    required
+                  />
+                  <p className="text-[10px] text-foreground/50 font-sans">
+                    Cette catégorie sera automatiquement créée et réutilisable.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -727,21 +920,38 @@ export default function BarStockManager() {
               </div>
             </div>
 
-            <div className="pt-2 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setEditModalOpen(false)}
-                className="px-3 py-2 rounded-lg bg-surface border border-[#353535] text-foreground/70 hover:text-white"
-              >
-                Annuler
-              </button>
-              <button
-                type="submit"
-                disabled={editLoading}
-                className="px-5 py-2 rounded-lg bg-primary text-black font-anybody font-black uppercase text-xs tracking-wider hover:bg-secondary hover:text-white transition-colors cursor-pointer"
-              >
-                {editLoading ? 'Enregistrement...' : 'Enregistrer'}
-              </button>
+            <div className="pt-3 flex items-center justify-between border-t border-[#292929]">
+              {editingItem.id ? (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteItem(editingItem.id!, editingItem.name || 'cet article')}
+                  disabled={deleteLoadingId === editingItem.id}
+                  className="px-3 py-2 rounded-lg bg-red-950/30 hover:bg-red-900/50 border border-red-500/30 hover:border-red-500/60 text-red-400 font-sans font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                  title="Supprimer définitivement l'article"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Supprimer</span>
+                </button>
+              ) : (
+                <div />
+              )}
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditModalOpen(false)}
+                  className="px-3 py-2 rounded-lg bg-surface border border-[#353535] text-foreground/70 hover:text-white"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={editLoading}
+                  className="px-5 py-2 rounded-lg bg-primary text-black font-anybody font-black uppercase text-xs tracking-wider hover:bg-secondary hover:text-white transition-colors cursor-pointer"
+                >
+                  {editLoading ? 'Enregistrement...' : 'Enregistrer'}
+                </button>
+              </div>
             </div>
           </form>
         </div>

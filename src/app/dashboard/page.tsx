@@ -16,6 +16,7 @@ import MemberKeysAndContractWidget from '@/modules/members/components/MemberKeys
 import FeedbackIdeasWidget from '@/modules/feedback/components/widgets/FeedbackIdeasWidget';
 import ProfileEditForm from '@/modules/members/components/ProfileEditForm';
 import OfficialDocumentsModal from '@/modules/members/components/OfficialDocumentsModal';
+import BarRechargeModal from '@/modules/buvette/components/BarRechargeModal';
 import {
   AlertTriangle,
   Calendar,
@@ -32,6 +33,9 @@ import {
   BookOpen,
   Award,
   ChevronRight,
+  Coffee,
+  Wallet,
+  CreditCard,
 } from 'lucide-react';
 import Link from 'next/link';
 import { ClubEvent, getErrorMessage } from '@/types/models';
@@ -67,6 +71,7 @@ export default function DashboardPage() {
   // Modale de lecture des documents officiels (ROI / Charte)
   const [activeDocModal, setActiveDocModal] = useState<'roi' | 'charte' | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [rechargeModalOpen, setRechargeModalOpen] = useState(false);
 
   const isMountedRef = useRef(true);
 
@@ -145,6 +150,8 @@ export default function DashboardPage() {
       </div>
     );
   }
+
+  const walletBalance = Number(effectiveProfile?.wallet_balance || 0);
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8 animate-fade-in">
@@ -262,8 +269,8 @@ export default function DashboardPage() {
         <PilotAttendanceWidget member={effectiveProfile} />
       </section>
 
-      {/* 2. Grille des Widgets Clés (Cadenas, Assurance FBA, Setups Teaser) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* 2. Grille des Widgets Clés (Cadenas, Solde Buvette, Assurance FBA, Setups) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Widget Cadenas d'accès */}
         <div className="premium-card p-5 rounded-lg border border-[#353535] flex flex-col justify-between space-y-3 relative overflow-hidden">
           <div className="flex items-center justify-between">
@@ -311,6 +318,56 @@ export default function DashboardPage() {
 
           <div className="text-[10px] font-mono text-foreground/40 border-t border-[#353535]/40 pt-2 flex items-center gap-1">
             <span>{isPaid ? '⚠️ Reverrouiller le cadenas après départ' : 'Cotisation annuelle requise'}</span>
+          </div>
+        </div>
+
+        {/* Widget Solde Buvette Pilote */}
+        <div className="premium-card p-5 rounded-lg border border-[#353535] flex flex-col justify-between space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Coffee className="w-5 h-5 text-primary" />
+              <h3 className="font-anybody font-black text-sm uppercase sport-skew text-white">
+                Solde Buvette
+              </h3>
+            </div>
+            <span
+              className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider border ${
+                walletBalance < 0
+                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-400'
+                  : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+              }`}
+            >
+              {walletBalance < 0 ? 'Ardoise' : 'Créditeur'}
+            </span>
+          </div>
+
+          <div className="py-1 space-y-2">
+            <div>
+              <span className="text-[10px] font-mono text-foreground/45 uppercase tracking-wider block mb-0.5">
+                {walletBalance < 0 ? 'Ardoise à apurer' : 'Solde disponible'}
+              </span>
+              <div
+                className={`text-2xl font-anybody font-black tracking-tight ${
+                  walletBalance < 0 ? 'text-rose-400' : 'text-emerald-400'
+                }`}
+              >
+                {walletBalance < 0
+                  ? `-${Math.abs(walletBalance).toFixed(2)} €`
+                  : `+${walletBalance.toFixed(2)} €`}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setRechargeModalOpen(true)}
+              className="w-full py-2 rounded bg-primary/20 hover:bg-primary/30 border border-primary/40 text-primary font-anybody font-bold text-xs uppercase tracking-wider transition-all cursor-pointer sport-skew flex items-center justify-center gap-1.5"
+            >
+              <CreditCard className="w-3.5 h-3.5" />
+              <span className="transform skew-x-8">Recharger par virement</span>
+            </button>
+          </div>
+
+          <div className="text-[10px] font-mono text-foreground/40 border-t border-[#353535]/40 pt-2 flex items-center gap-1">
+            <span>Débité à la caisse du club</span>
           </div>
         </div>
 
@@ -523,6 +580,18 @@ export default function DashboardPage() {
           isOpen={paymentModalOpen}
           onClose={() => setPaymentModalOpen(false)}
           onPaymentUpdated={refreshAuth}
+        />
+      )}
+
+      {/* Modale de Recharge Solde Buvette par Virement */}
+      {rechargeModalOpen && (
+        <BarRechargeModal
+          member={effectiveProfile}
+          isOpen={rechargeModalOpen}
+          onClose={() => {
+            setRechargeModalOpen(false);
+            refreshAuth();
+          }}
         />
       )}
 

@@ -9,7 +9,7 @@ import {
   updateMemberRoleAndPermissions,
 } from '@/modules/admin/actions';
 import { createClient } from '@/lib/supabase/client';
-import { Shield, Users, Lock, Key, Ghost, ShieldAlert, RefreshCw, Radio, Flag, Coins } from 'lucide-react';
+import { Shield, Users, Lock, Key, Ghost, ShieldAlert, RefreshCw, Radio, Flag, Coins, Lightbulb } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { usePermissions } from '@/modules/admin/hooks/usePermissions';
 import { useSimulation } from '@/modules/admin/contexts/SimulationContext';
@@ -24,8 +24,9 @@ import AccessCodeTab from '@/modules/admin/components/AccessCodeTab';
 import CommunicationsTab from '@/modules/admin/components/CommunicationsTab';
 import AdminTracksTab from '@/modules/tracks/components/AdminTracksTab';
 import TreasuryTab from '@/modules/admin/components/TreasuryTab';
+import AdminFeedbackTab from '@/modules/feedback/components/AdminFeedbackTab';
 
-type AdminTab = 'members' | 'blacklist' | 'treasury' | 'tracks' | 'communications' | 'permissions' | 'cadenas';
+type AdminTab = 'members' | 'blacklist' | 'treasury' | 'tracks' | 'communications' | 'feedback' | 'permissions' | 'cadenas';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -339,6 +340,18 @@ export default function AdminPage() {
         </button>
 
         <button
+          onClick={() => setActiveTab('feedback')}
+          className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
+            activeTab === 'feedback'
+              ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
+              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
+          }`}
+        >
+          <Lightbulb className="w-3.5 h-3.5" />
+          <span className="transform skew-x-8">Idées & Signalements</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('permissions')}
           className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
             activeTab === 'permissions'
@@ -413,6 +426,10 @@ export default function AdminPage() {
           canEdit={permissions.can('news', 'edit') || permissions.isSuperAdmin || permissions.isAdmin}
           isSimulated={Boolean(simulatedProfile)}
         />
+      )}
+
+      {activeTab === 'feedback' && (
+        <AdminFeedbackTab />
       )}
 
       {activeTab === 'permissions' && (

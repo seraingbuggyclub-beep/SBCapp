@@ -36,6 +36,12 @@ export default function PitLanePage() {
 
   useEffect(() => {
     fetchNews();
+    try {
+      localStorage.setItem('sbc_last_read_brief_date', new Date().toISOString());
+      window.dispatchEvent(new Event('sbc_brief_read'));
+    } catch {
+      // safe fallback
+    }
   }, []);
 
   const getCategoryConfig = (cat: AnnouncementCategory) => {

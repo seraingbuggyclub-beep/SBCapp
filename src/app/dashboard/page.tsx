@@ -14,6 +14,7 @@ import MemberPrivacyCenter from '@/modules/gdpr/components/MemberPrivacyCenter';
 import MembershipPaymentModal from '@/modules/payments/components/MembershipPaymentModal';
 import ReferentContractSignatureModal from '@/modules/members/components/ReferentContractSignatureModal';
 import MemberKeysAndContractWidget from '@/modules/members/components/MemberKeysAndContractWidget';
+import FeedbackIdeasWidget from '@/modules/feedback/components/widgets/FeedbackIdeasWidget';
 import {
   User,
   CheckCircle2,
@@ -595,7 +596,10 @@ export default function DashboardPage() {
         onOpenDocModal={(doc) => setActiveDocModal(doc)}
       />
 
-      {/* 5. Formulaire complet de gestion du Profil Pilote */}
+      {/* 5. Boîte à Idées & Signalement d'Anomalies */}
+      <FeedbackIdeasWidget member={effectiveProfile} />
+
+      {/* 6. Formulaire complet de gestion du Profil Pilote */}
       <div className="premium-card p-6 md:p-8 rounded-lg border border-[#353535] space-y-6">
         <div className="flex items-center justify-between border-b border-[#353535] pb-4">
           <div className="flex items-center gap-2.5">

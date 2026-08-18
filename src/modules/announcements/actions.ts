@@ -62,6 +62,57 @@ export async function getAnnouncements(): Promise<{ data: ClubAnnouncement[]; er
   }
 }
 
+// Récupérer l'annonce épinglée la plus récente pour la landing page
+export async function getPinnedAnnouncement(): Promise<{ data: ClubAnnouncement | null; error: string | null }> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from('sbc_announcements')
+      .select('*')
+      .eq('is_pinned', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      // Si la table n'existe pas encore ou erreur, chercher dans les fallbacks
+      const fallbackPinned = FALLBACK_ANNOUNCEMENTS.find((a) => a.is_pinned) || null;
+      return { data: fallbackPinned, error: null };
+    }
+
+    if (!data) {
+      const fallbackPinned = FALLBACK_ANNOUNCEMENTS.find((a) => a.is_pinned) || null;
+      return { data: fallbackPinned, error: null };
+    }
+
+    return { data: data as ClubAnnouncement, error: null };
+  } catch (err) {
+    const fallbackPinned = FALLBACK_ANNOUNCEMENTS.find((a) => a.is_pinned) || null;
+    return { data: fallbackPinned, error: null };
+  }
+}
+
+// Récupérer la date de la toute dernière annonce pour la notification Pit-Lane
+export async function getLatestAnnouncementDate(): Promise<string | null> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from('sbc_announcements')
+      .select('created_at')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) {
+      return FALLBACK_ANNOUNCEMENTS[0]?.created_at || null;
+    }
+
+    return data.created_at;
+  } catch {
+    return FALLBACK_ANNOUNCEMENTS[0]?.created_at || null;
+  }
+}
+
 // Vérifier les droits d'administration pour la gestion des annonces
 async function verifyAdminCaller() {
   const supabase = await createClient();

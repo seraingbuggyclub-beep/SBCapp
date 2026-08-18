@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, LayoutDashboard, MapPin, ShieldAlert, Award, Calendar, Radio, Shield } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useUnreadBrief } from '@/hooks/useUnreadBrief';
 
 export default function AppSidebar() {
   const pathname = usePathname();
   const { isAdmin } = useAuth();
+  const { hasUnreadBrief, markAsRead } = useUnreadBrief();
 
   const links = [
     { href: '/', label: 'Accueil', icon: Home },
@@ -30,18 +32,28 @@ export default function AppSidebar() {
             {links.map((link) => {
               const Icon = link.icon;
               const isActive = pathname === link.href;
+              const isPitLane = link.href === '/pit-lane';
+              const showUnread = isPitLane && hasUnreadBrief;
+
               return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded font-medium text-sm transition-all border ${
+                  onClick={() => {
+                    if (isPitLane) markAsRead();
+                  }}
+                  className={`flex items-center justify-between px-3 py-2.5 rounded font-medium text-sm transition-all border ${
                     isActive
                       ? 'bg-primary/10 text-primary border-primary/20 shadow-[inset_0_0_12px_rgba(255,110,0,0.1)]'
+                      : showUnread
+                      ? 'bg-primary/5 text-primary border-primary/30 animate-pulse drop-shadow-[0_0_8px_rgba(255,110,0,0.5)]'
                       : 'text-foreground/75 border-transparent hover:bg-surface/50 hover:text-foreground'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-primary' : 'text-foreground/50'}`} />
-                  {link.label}
+                  <div className="flex items-center gap-3">
+                    <Icon className={`w-4 h-4 ${isActive || showUnread ? 'text-primary' : 'text-foreground/50'}`} />
+                    <span className={showUnread ? 'font-bold' : ''}>{link.label}</span>
+                  </div>
                 </Link>
               );
             })}

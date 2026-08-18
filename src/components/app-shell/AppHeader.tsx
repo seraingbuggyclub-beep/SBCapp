@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { useSimulation } from '@/modules/admin/contexts/SimulationContext';
+import { useUnreadBrief } from '@/hooks/useUnreadBrief';
 import { LogOut, User, Key, Menu, X, Shield, Radio, Trophy, LayoutDashboard, QrCode } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import QrCodeModal from '@/modules/members/components/QrCodeModal';
@@ -12,6 +13,7 @@ export default function AppHeader() {
   const { user, profile, isAdmin, signOut } = useAuth();
   const { simulatedProfile, isSimulationActive } = useSimulation();
   const effectiveProfile = simulatedProfile || profile;
+  const { hasUnreadBrief, markAsRead } = useUnreadBrief();
 
   const [isOpen, setIsOpen] = useState(false);
   const [headerQrOpen, setHeaderQrOpen] = useState(false);
@@ -58,17 +60,29 @@ export default function AppHeader() {
 
         {/* Navigation Links in Center (Desktop) */}
         <nav className="hidden md:flex items-center gap-6 lg:gap-8">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`font-anybody text-xs font-bold uppercase tracking-wider transition-colors sport-skew ${
-                pathname === link.href ? 'text-primary' : 'text-foreground/60 hover:text-primary'
-              }`}
-            >
-              <span className="transform skew-x-8">{link.label}</span>
-            </Link>
-          ))}
+          {navLinks.map((link) => {
+            const isPitLane = link.href === '/pit-lane';
+            const showUnread = isPitLane && hasUnreadBrief;
+
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => {
+                  if (isPitLane) markAsRead();
+                }}
+                className={`font-anybody text-xs font-bold uppercase tracking-wider transition-colors sport-skew relative flex items-center ${
+                  showUnread
+                    ? 'text-primary animate-pulse drop-shadow-[0_0_8px_rgba(255,110,0,0.9)]'
+                    : pathname === link.href
+                    ? 'text-primary'
+                    : 'text-foreground/60 hover:text-primary'
+                }`}
+              >
+                <span className="transform skew-x-8">{link.label}</span>
+              </Link>
+            );
+          })}
           {isAdmin && (
             <Link
               href="/admin"
@@ -150,17 +164,31 @@ export default function AppHeader() {
       {isOpen && (
         <div className="md:hidden bg-background border-b border-[#353535] px-6 py-6 space-y-4 font-anybody font-bold uppercase tracking-wider text-sm animate-fade-in shadow-2xl">
           <div className="flex flex-col space-y-3">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`py-2 border-b border-[#353535]/50 transition-colors ${
-                  pathname === link.href ? 'text-primary pl-2 border-primary' : 'text-foreground/70 hover:text-primary'
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const isPitLane = link.href === '/pit-lane';
+              const showUnread = isPitLane && hasUnreadBrief;
+
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => {
+                    if (isPitLane) markAsRead();
+                  }}
+                  className={`py-2 border-b border-[#353535]/50 flex items-center justify-between transition-colors ${
+                    pathname === link.href ? 'text-primary pl-2 border-primary' : 'text-foreground/70 hover:text-primary'
+                  }`}
+                >
+                  <span>{link.label}</span>
+                  {showUnread && (
+                    <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-primary/20 border border-primary/40 text-primary text-[10px] font-mono font-bold animate-pulse">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      <span>NOUVEAU</span>
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
 
             {isAdmin && (
               <Link

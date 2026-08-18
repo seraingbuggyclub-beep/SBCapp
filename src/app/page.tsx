@@ -1,6 +1,8 @@
 import React from 'react';
 import Link from 'next/link';
 import { getPublicActivePresences } from '@/modules/presence/actions';
+import { getPinnedAnnouncement } from '@/modules/announcements/actions';
+import PinnedBriefBanner from '@/modules/announcements/components/PinnedBriefBanner';
 import PresenceList from '@/modules/presence/components/PresenceList';
 import FbaDisclaimer from '@/modules/presence/components/FbaDisclaimer';
 import { Trophy, Shield, MapPin, Key, Radio, Navigation, UserCheck, LockOpen } from 'lucide-react';
@@ -13,7 +15,10 @@ import MemberQrCodeCard from '@/modules/members/components/MemberQrCodeCard';
 export const revalidate = 0; // Force SSR
 
 export default async function LandingPage() {
-  const { data: activePresences } = await getPublicActivePresences();
+  const [{ data: activePresences }, { data: pinnedAnnouncement }] = await Promise.all([
+    getPublicActivePresences(),
+    getPinnedAnnouncement(),
+  ]);
 
   // Check if current user is logged in and in order of payment to show the lock code
   const supabase = await createClient();
@@ -106,6 +111,9 @@ export default async function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Pinned Brief Announcement Banner */}
+      <PinnedBriefBanner announcement={pinnedAnnouncement} />
 
       {/* Main content in a centered container */}
       <div className="w-full max-w-6xl mx-auto px-6 py-10 space-y-8 relative z-10">

@@ -41,17 +41,51 @@ export function usePermissions(
     return isSuper || activeProfile?.role === 'admin';
   }, [isSuper, activeProfile?.role]);
 
+  const isReferentUser = useMemo(() => {
+    return activeProfile?.role === 'referent';
+  }, [activeProfile?.role]);
+
+  const referentPermissions = useMemo(() => {
+    return activeProfile?.referent_permissions || null;
+  }, [activeProfile?.referent_permissions]);
+
+  const canManageTrack = useMemo(() => {
+    return (trackId: string): boolean => {
+      if (isAdminUser) return true;
+      if (!isReferentUser || !referentPermissions) return false;
+      return (
+        Boolean(referentPermissions.can_open_close_tracks) &&
+        Array.isArray(referentPermissions.allowed_track_ids) &&
+        referentPermissions.allowed_track_ids.includes(trackId)
+      );
+    };
+  }, [isAdminUser, isReferentUser, referentPermissions]);
+
   const can = useMemo(() => {
     return (moduleId: string, actionId: string): boolean => {
       if (isSuper) return true;
       if (!activeProfile) return false;
+      
+      // Si référent, vérification des prérogatives modulaires spécifiques
+      if (isReferentUser && referentPermissions) {
+        if (moduleId === 'tracks') return Boolean(referentPermissions.can_open_close_tracks);
+        if (moduleId === 'events') return Boolean(referentPermissions.can_manage_track_events);
+        if (moduleId === 'buvette' || moduleId === 'bar') return Boolean(referentPermissions.can_manage_bar);
+        if (moduleId === 'presences' || moduleId === 'attendance') return Boolean(referentPermissions.can_view_attendance);
+        if (moduleId === 'pit_lane' || moduleId === 'news') return Boolean(referentPermissions.can_manage_pit_lane);
+        return false;
+      }
+
       return hasPermission(activeProfile.role, activeProfile.permissions, moduleId, actionId, activeUser?.email);
     };
-  }, [isSuper, activeProfile, activeUser?.email]);
+  }, [isSuper, activeProfile, isReferentUser, referentPermissions, activeUser?.email]);
 
   return {
     isSuperAdmin: isSuper,
     isAdmin: isAdminUser,
+    isReferent: isReferentUser,
+    referentPermissions,
+    canManageTrack,
     activeProfile,
     can,
     role: activeProfile?.role || 'visitor',

@@ -3,18 +3,20 @@
 import React, { useState, useEffect } from 'react';
 import { TrackItem } from '@/types/models';
 import { getTracks, updateTrackStatus } from '../actions';
-import { Flag, CheckCircle2, AlertTriangle, RefreshCw, Clock, ShieldCheck, Zap } from 'lucide-react';
+import { Flag, CheckCircle2, AlertTriangle, RefreshCw, Clock, ShieldCheck, Zap, Lock } from 'lucide-react';
+import { usePermissions } from '@/modules/admin/hooks/usePermissions';
 
 interface AdminTracksTabProps {
-  canEdit: boolean;
+  canEdit?: boolean;
   isSimulated?: boolean;
 }
 
-export default function AdminTracksTab({ canEdit, isSimulated = false }: AdminTracksTabProps) {
+export default function AdminTracksTab({ canEdit = true, isSimulated = false }: AdminTracksTabProps) {
   const [tracks, setTracks] = useState<TrackItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const permissions = usePermissions();
 
   const fetchTracks = async () => {
     setLoading(true);
@@ -36,8 +38,9 @@ export default function AdminTracksTab({ canEdit, isSimulated = false }: AdminTr
       return;
     }
 
-    if (!canEdit) {
-      setMessage({ text: 'Action non autorisée : permissions insuffisantes.', type: 'error' });
+    const canManageThisTrack = permissions.canManageTrack(track.id);
+    if (!canManageThisTrack && !permissions.isAdmin) {
+      setMessage({ text: 'Action non autorisée : vous n\'êtes pas référent pour cette piste.', type: 'error' });
       setTimeout(() => setMessage(null), 3000);
       return;
     }
@@ -138,6 +141,7 @@ export default function AdminTracksTab({ canEdit, isSimulated = false }: AdminTr
         {tracks.map((track) => {
           const isUpdating = updatingId === track.id;
           const isOpen = track.is_open;
+          const isTrackManageable = permissions.isAdmin || permissions.canManageTrack(track.id);
 
           return (
             <div
@@ -154,6 +158,17 @@ export default function AdminTracksTab({ canEdit, isSimulated = false }: AdminTr
                     <span className="font-anybody font-black text-xl text-white tracking-tight uppercase">
                       Piste {track.name}
                     </span>
+                    {permissions.isReferent && isTrackManageable && (
+                      <span className="px-2 py-0.5 rounded bg-primary/20 border border-primary/40 text-primary text-[9px] font-mono font-bold uppercase">
+                        Assignée
+                      </span>
+                    )}
+                    {permissions.isReferent && !isTrackManageable && (
+                      <span className="px-2 py-0.5 rounded bg-secondary/20 border border-secondary/40 text-secondary text-[9px] font-mono font-bold uppercase flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5" />
+                        Lecture Seule
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5 text-[11px] font-mono text-foreground/50">
                     <Clock className="w-3 h-3" />
@@ -180,14 +195,18 @@ export default function AdminTracksTab({ canEdit, isSimulated = false }: AdminTr
               {/* Toggle Switch Button */}
               <div className="pt-2 border-t border-[#353535] flex items-center justify-between gap-3">
                 <span className="text-xs font-mono text-foreground/60">
-                  {isOpen ? 'Basculer vers Fermée / Travaux' : 'Basculer vers Piste Ouverte'}
+                  {!isTrackManageable
+                    ? 'Modification non autorisée (Réservée aux référents assignés)'
+                    : isOpen
+                    ? 'Basculer vers Fermée / Travaux'
+                    : 'Basculer vers Piste Ouverte'}
                 </span>
 
                 <button
                   type="button"
                   onClick={() => handleToggle(track)}
-                  disabled={isUpdating || !canEdit}
-                  className={`relative inline-flex h-8 w-16 shrink-0 cursor-pointer rounded-full border-2 transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
+                  disabled={isUpdating || !canEdit || !isTrackManageable}
+                  className={`relative inline-flex h-8 w-16 shrink-0 cursor-pointer rounded-full border-2 transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${
                     isOpen
                       ? 'bg-green-500 border-green-400'
                       : 'bg-zinc-800 border-red-500/60'

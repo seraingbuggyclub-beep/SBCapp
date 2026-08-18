@@ -67,12 +67,16 @@ export async function getTracks(): Promise<{ data: TrackItem[]; error: string | 
   }
 }
 
+import { isSuperAdmin } from '../admin/permissions';
+import { ReferentPermissions } from '@/types/models';
+
 /**
- * Met à jour l'état d'ouverture d'une piste (Réservé aux administrateurs)
+ * Met à jour l'état d'ouverture d'une piste (Admins et Référents assignés)
  */
 export async function updateTrackStatus(
   id: string,
-  is_open: boolean
+  is_open: boolean,
+  status?: 'OPEN' | 'CLOSED' | 'WORK'
 ): Promise<{ success: boolean; error: string | null; updated?: TrackItem }> {
   try {
     const supabase = await createClient();
@@ -85,19 +89,30 @@ export async function updateTrackStatus(
 
     const { data: memberProfile } = await supabase
       .from('sbc_members')
-      .select('role')
+      .select('role, email, referent_permissions')
       .eq('id', user.id)
       .single();
 
-    if (memberProfile?.role !== 'admin') {
-      return { success: false, error: 'Action réservée aux administrateurs.' };
+    const isSuper = isSuperAdmin(memberProfile?.email || user.email);
+    const isAdmin = memberProfile?.role === 'admin';
+    const isAssignedReferent =
+      memberProfile?.role === 'referent' &&
+      memberProfile.referent_permissions &&
+      Boolean((memberProfile.referent_permissions as ReferentPermissions).can_open_close_tracks) &&
+      Array.isArray((memberProfile.referent_permissions as ReferentPermissions).allowed_track_ids) &&
+      (memberProfile.referent_permissions as ReferentPermissions).allowed_track_ids.includes(id);
+
+    if (!isSuper && !isAdmin && !isAssignedReferent) {
+      return { success: false, error: 'Action non autorisée sur cette piste.' };
     }
 
+    const nextStatus = status || (is_open ? 'OPEN' : 'CLOSED');
     const now = new Date().toISOString();
     const { data, error } = await supabase
       .from('tracks')
       .update({
         is_open,
+        status: nextStatus,
         updated_at: now,
       })
       .eq('id', id)

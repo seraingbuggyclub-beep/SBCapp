@@ -11,17 +11,27 @@ export type Json =
 // ==========================================
 // RÔLES ET STATUTS
 // ==========================================
-export type UserRole = 'visitor' | 'member' | 'daily_member' | 'admin';
+export type UserRole = 'visitor' | 'member' | 'daily_member' | 'referent' | 'admin';
 export type PaymentStatus = 'pending' | 'paid' | 'expired' | 'exempt';
 export type CheckInType = 'manual' | 'auto';
 export type EventType = 'sbc_race' | 'belgian_championship' | 'holiday' | 'club_meeting';
 export type EventStatus = 'open' | 'closed' | 'ongoing' | 'completed' | 'cancelled' | 'draft';
 
 // ==========================================
-// PERMISSIONS ASBL
+// PERMISSIONS ASBL & RÉFÉRENTS
 // ==========================================
 export type ModulePermissionAction = 'view' | 'edit' | 'delete' | 'manage';
 export type ModulePermissionsMap = Record<string, string[] | Record<string, boolean>>;
+
+export interface ReferentPermissions {
+  allowed_track_ids: string[];
+  can_open_close_tracks: boolean;
+  can_manage_track_events: boolean;
+  allowed_event_track_ids: string[];
+  can_manage_bar: boolean;
+  can_view_attendance: boolean;
+  can_manage_pit_lane: boolean;
+}
 
 // ==========================================
 // PROFILS MEMBRES
@@ -33,6 +43,7 @@ export type MemberUpdate = TablesUpdate<'sbc_members'>;
 export interface MemberProfile extends MemberRow {
   role?: UserRole;
   permissions?: ModulePermissionsMap | null;
+  referent_permissions?: ReferentPermissions | null;
 }
 
 export interface MemberProfileUpdateInput {
@@ -230,10 +241,17 @@ export type TrackRow = Tables<'tracks'>;
 export type TrackInsert = TablesInsert<'tracks'>;
 export type TrackUpdate = TablesUpdate<'tracks'>;
 
+export type TrackStatus = 'OPEN' | 'CLOSED' | 'WORK';
+
 export interface TrackItem {
   id: string;
   name: string;
+  slug?: string;
+  type?: string | null;
+  status?: TrackStatus;
   is_open: boolean;
+  description?: string | null;
+  created_at?: string | null;
   updated_at?: string | null;
 }
 

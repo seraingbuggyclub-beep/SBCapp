@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/modules/admin/hooks/usePermissions';
 import { ClubEvent, SelectedCategoryItem, SelectedMealItem } from '@/types/models';
 import CategoryMealFields from '@/modules/events/components/CategoryMealFields';
 
@@ -85,6 +86,9 @@ interface EventRegistrationAdminItem {
 
 export default function AdminEventsPage() {
   const { user: currentUser, profile: userProfile, isAdmin: userIsAdmin } = useAuth();
+  const permissions = usePermissions(currentUser, userProfile);
+  const canAccessEvents = permissions.isAdmin || Boolean(permissions.referentPermissions?.can_manage_track_events);
+
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminPass, setAdminPass] = useState('');
   const [passError, setPassError] = useState('');
@@ -130,11 +134,11 @@ export default function AdminEventsPage() {
   }, []);
 
   useEffect(() => {
-    if (userIsAdmin) {
+    if (canAccessEvents) {
       setIsAdmin(true);
       fetchEvents();
     }
-  }, [userIsAdmin, fetchEvents]);
+  }, [canAccessEvents, fetchEvents]);
 
   const handleAdminAuth = async (e: React.FormEvent) => {
     e.preventDefault();

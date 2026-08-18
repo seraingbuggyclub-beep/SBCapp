@@ -5,6 +5,7 @@ import { TrackItem } from '@/types/models';
 import { getTracks, updateTrackStatus } from '../actions';
 import { Flag, CheckCircle2, AlertTriangle, RefreshCw, Clock, ShieldCheck, Zap, Lock } from 'lucide-react';
 import { usePermissions } from '@/modules/admin/hooks/usePermissions';
+import { useAuth } from '@/hooks/useAuth';
 
 interface AdminTracksTabProps {
   canEdit?: boolean;
@@ -16,7 +17,15 @@ export default function AdminTracksTab({ canEdit = true, isSimulated = false }: 
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  const permissions = usePermissions();
+  
+  const { user, profile } = useAuth();
+  const permissions = usePermissions(user, profile);
+
+  const isSuperOrAdmin = permissions.isSuperAdmin || permissions.isAdmin || profile?.role === 'admin' || profile?.role === 'super_admin' || canEdit;
+  const canEditTrack = (trackId: string): boolean => {
+    if (isSuperOrAdmin) return true;
+    return permissions.canManageTrack(trackId);
+  };
 
   const fetchTracks = async () => {
     setLoading(true);
@@ -38,8 +47,7 @@ export default function AdminTracksTab({ canEdit = true, isSimulated = false }: 
       return;
     }
 
-    const canManageThisTrack = permissions.canManageTrack(track.id);
-    if (!canManageThisTrack && !permissions.isAdmin) {
+    if (!canEditTrack(track.id)) {
       setMessage({ text: 'Action non autorisée : vous n\'êtes pas référent pour cette piste.', type: 'error' });
       setTimeout(() => setMessage(null), 3000);
       return;
@@ -141,7 +149,10 @@ export default function AdminTracksTab({ canEdit = true, isSimulated = false }: 
         {tracks.map((track) => {
           const isUpdating = updatingId === track.id;
           const isOpen = track.is_open;
-          const isTrackManageable = permissions.isAdmin || permissions.canManageTrack(track.id);
+          const isTrackManageable = canEditTrack(track.id);
+          const trackDisplayName = track.name?.toLowerCase().startsWith('piste')
+            ? track.name
+            : `Piste ${track.name}`;
 
           return (
             <div
@@ -156,14 +167,14 @@ export default function AdminTracksTab({ canEdit = true, isSimulated = false }: 
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="font-anybody font-black text-xl text-white tracking-tight uppercase">
-                      Piste {track.name}
+                      {trackDisplayName}
                     </span>
-                    {permissions.isReferent && isTrackManageable && (
+                    {!isSuperOrAdmin && permissions.isReferent && isTrackManageable && (
                       <span className="px-2 py-0.5 rounded bg-primary/20 border border-primary/40 text-primary text-[9px] font-mono font-bold uppercase">
                         Assignée
                       </span>
                     )}
-                    {permissions.isReferent && !isTrackManageable && (
+                    {!isSuperOrAdmin && permissions.isReferent && !isTrackManageable && (
                       <span className="px-2 py-0.5 rounded bg-secondary/20 border border-secondary/40 text-secondary text-[9px] font-mono font-bold uppercase flex items-center gap-1">
                         <Lock className="w-2.5 h-2.5" />
                         Lecture Seule
@@ -205,7 +216,7 @@ export default function AdminTracksTab({ canEdit = true, isSimulated = false }: 
                 <button
                   type="button"
                   onClick={() => handleToggle(track)}
-                  disabled={isUpdating || !canEdit || !isTrackManageable}
+                  disabled={isUpdating || !isTrackManageable}
                   className={`relative inline-flex h-8 w-16 shrink-0 cursor-pointer rounded-full border-2 transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${
                     isOpen
                       ? 'bg-green-500 border-green-400'
@@ -214,7 +225,7 @@ export default function AdminTracksTab({ canEdit = true, isSimulated = false }: 
                   role="switch"
                   aria-checked={isOpen}
                 >
-                  <span className="sr-only">Modifier l'état de la piste {track.name}</span>
+                  <span className="sr-only">Modifier l'état de {trackDisplayName}</span>
                   <span
                     aria-hidden="true"
                     className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out mt-0.5 ${

@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { ClubEvent, EventRegistration, SelectedCategoryItem } from '@/types/models';
+import WorkSessionPilotSection from '@/modules/work-sessions/components/WorkSessionPilotSection';
+import { Wrench } from 'lucide-react';
 
 interface RegistrationWithEvent extends EventRegistration {
   sbc_events?: {
@@ -45,6 +47,7 @@ export default function EventsPage() {
   const [events, setEvents] = useState<ClubEvent[]>([]);
   const [registrations, setRegistrations] = useState<RegistrationWithEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
+  const [activeMainTab, setActiveMainTab] = useState<'events' | 'work_sessions'>('events');
 
   const {
     selectedEvent,
@@ -312,7 +315,7 @@ export default function EventsPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-8 py-4">
       {/* Header */}
-      <div className="flex justify-between items-center border-b border-[#353535] pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#353535] pb-4">
         <div>
           <h1 className="font-anybody font-black text-2xl md:text-3xl uppercase tracking-tight sport-skew text-white">
             Calendrier & <span className="text-primary">Inscriptions</span>
@@ -321,12 +324,50 @@ export default function EventsPage() {
             Pilote : {profile?.first_name} {profile?.last_name} ({profile?.license_number || 'Licence FBA'})
           </p>
         </div>
+
+        {/* Navigation Onglets Événements / Sessions Travaux */}
+        <div className="flex items-center gap-2 overflow-x-auto">
+          <button
+            onClick={() => {
+              setActiveMainTab('events');
+              resetRegistration();
+            }}
+            className={`px-4 py-2 rounded-lg font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
+              activeMainTab === 'events'
+                ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
+                : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white'
+            }`}
+          >
+            <Trophy className="w-4 h-4" />
+            <span className="transform skew-x-8">Courses & Compétitions</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveMainTab('work_sessions');
+              resetRegistration();
+            }}
+            className={`px-4 py-2 rounded-lg font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
+              activeMainTab === 'work_sessions'
+                ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
+                : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white'
+            }`}
+          >
+            <Wrench className="w-4 h-4" />
+            <span className="transform skew-x-8">Sessions Travaux & Bénévoles</span>
+          </button>
+        </div>
       </div>
 
       <FbaDisclaimer />
 
-      {/* Bloc de Formulaire d'Inscription / Modification */}
-      {selectedEvent ? (
+      {/* Vue Sessions Travaux */}
+      {activeMainTab === 'work_sessions' ? (
+        <WorkSessionPilotSection />
+      ) : (
+        <>
+          {/* Bloc de Formulaire d'Inscription / Modification */}
+          {selectedEvent ? (
         <div className="space-y-3">
           <button
             type="button"
@@ -742,6 +783,8 @@ export default function EventsPage() {
             )}
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

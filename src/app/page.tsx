@@ -118,26 +118,22 @@ export default async function LandingPage() {
       {/* Main content in a centered container */}
       <div className="w-full max-w-6xl mx-auto px-6 py-10 space-y-8 relative z-10">
         
-        {/* Pass Pilote si l'utilisateur est connecté */}
-        {profile && (
-          <section className="max-w-xl mx-auto w-full">
-            <MemberQrCodeCard member={profile} />
-          </section>
-        )}
-
         {/* Live Track Status & Weather */}
         <section>
           <TracksLiveStatus />
         </section>
 
+        {/* Pilote Pass & Pilotes en Piste (Grille 50/50) */}
+        <section className={profile ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : "max-w-3xl mx-auto"}>
+          {profile && (
+            <MemberQrCodeCard member={profile} />
+          )}
+          <PresenceList presences={activePresences || []} />
+        </section>
+
         {/* FBA Insurance Warning */}
         <section>
           <FbaDisclaimer />
-        </section>
-
-        {/* Live Presence List */}
-        <section className="max-w-3xl mx-auto">
-          <PresenceList presences={activePresences || []} />
         </section>
 
         {/* Interactive Club Events & Belgian Holidays Calendar */}

@@ -7,6 +7,7 @@ import AdminNav from '@/components/admin/AdminNav';
 import BarPosTerminal from '@/modules/buvette/components/BarPosTerminal';
 import BarStockManager from '@/modules/buvette/components/BarStockManager';
 import BarAccountsManager from '@/modules/buvette/components/BarAccountsManager';
+import WorkSessionBarTerminal from '@/modules/work-sessions/components/WorkSessionBarTerminal';
 import {
   Coffee,
   Boxes,
@@ -15,10 +16,11 @@ import {
   Coins,
   ShieldAlert,
   ArrowLeft,
+  Wrench,
 } from 'lucide-react';
 import Link from 'next/link';
 
-type BuvetteTab = 'pos' | 'stocks' | 'accounts';
+type BuvetteTab = 'pos' | 'stocks' | 'accounts' | 'volunteers';
 
 export default function AdminBuvettePage() {
   const { user, profile } = useAuth();
@@ -86,6 +88,18 @@ export default function AdminBuvettePage() {
           </button>
 
           <button
+            onClick={() => setActiveTab('volunteers')}
+            className={`px-4 py-2 rounded-lg font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
+              activeTab === 'volunteers'
+                ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
+                : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white'
+            }`}
+          >
+            <Wrench className="w-4 h-4" />
+            <span className="transform skew-x-8">Packs Bénévoles</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('stocks')}
             className={`px-4 py-2 rounded-lg font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
               activeTab === 'stocks'
@@ -113,6 +127,7 @@ export default function AdminBuvettePage() {
 
       {/* Contenu Onglet Actif */}
       {activeTab === 'pos' && <BarPosTerminal />}
+      {activeTab === 'volunteers' && <WorkSessionBarTerminal />}
       {activeTab === 'stocks' && <BarStockManager />}
       {activeTab === 'accounts' && <BarAccountsManager />}
     </div>

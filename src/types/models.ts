@@ -671,6 +671,82 @@ export interface AssignKeyInput {
 }
 
 // ==========================================
+// SESSIONS TRAVAUX & PACKS BÉNÉVOLES
+// ==========================================
+export type WorkSessionStatus = 'OPEN' | 'IN_PROGRESS' | 'CLOSED';
+export type WorkSessionRedeemType = 'SOFT' | 'WATER' | 'MEAL';
+
+export interface WorkSession {
+  id: string;
+  title: string;
+  description?: string | null;
+  session_date: string;
+  start_time: string;
+  end_time: string;
+  max_participants: number;
+  free_softs_quota: number;
+  available_meals: string[];
+  status: WorkSessionStatus;
+  closed_at?: string | null;
+  closed_by?: string | null;
+  created_at: string;
+  volunteers_count?: number;
+  volunteers?: WorkSessionVolunteer[];
+  closed_by_member?: {
+    first_name: string;
+    last_name: string;
+  } | null;
+}
+
+export interface WorkSessionVolunteer {
+  id: string;
+  session_id: string;
+  member_id: string;
+  selected_meal: string;
+  meal_redeemed: boolean;
+  softs_used: number;
+  water_used: number;
+  checkin_at?: string | null;
+  checkin_by?: string | null;
+  created_at: string;
+  member?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone?: string | null;
+    license_number?: string | null;
+  } | null;
+  checkin_by_member?: {
+    first_name: string;
+    last_name: string;
+  } | null;
+}
+
+export interface CreateWorkSessionInput {
+  title: string;
+  description?: string;
+  session_date: string;
+  start_time: string;
+  end_time: string;
+  max_participants: number;
+  free_softs_quota?: number;
+  available_meals?: string[];
+}
+
+export interface WorkSessionReport {
+  sessionId: string;
+  title: string;
+  date: string;
+  totalVolunteers: number;
+  checkedInVolunteers: number;
+  softsRedeemed: number;
+  waterRedeemed: number;
+  mealsRedeemed: number;
+  estimatedExpense: number;
+}
+
+// ==========================================
 // HELPERS D'ERREUR TYPESAFE
 // ==========================================
 export function getErrorMessage(err: unknown): string {

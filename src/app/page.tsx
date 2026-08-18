@@ -15,34 +15,26 @@ import MemberQrCodeCard from '@/modules/members/components/MemberQrCodeCard';
 export const revalidate = 0; // Force SSR
 
 export default async function LandingPage() {
-  const [{ data: activePresences }, { data: pinnedAnnouncement }] = await Promise.all([
+  const supabase = await createClient();
+
+  const [{ data: activePresences }, { data: pinnedAnnouncement }, { data: { user } }] = await Promise.all([
     getPublicActivePresences(),
     getPinnedAnnouncement(),
+    supabase.auth.getUser(),
   ]);
 
-  // Check if current user is logged in and in order of payment to show the lock code
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
   let profile = null;
   let clubConfig = null;
-  
+
   if (user) {
-    const { data: profileData } = await supabase
-      .from('sbc_members')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-    
-    profile = profileData;
-    
+    const [profileRes, configRes] = await Promise.all([
+      supabase.from('sbc_members').select('*').eq('id', user.id).single(),
+      supabase.from('sbc_club_config').select('lock_code').limit(1).maybeSingle(),
+    ]);
+
+    profile = profileRes.data;
     if (profile?.payment_status === 'paid') {
-      const { data: configData } = await supabase
-        .from('sbc_club_config')
-        .select('lock_code')
-        .limit(1)
-        .maybeSingle();
-      clubConfig = configData;
+      clubConfig = configRes.data;
     }
   }
 

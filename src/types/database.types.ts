@@ -53,6 +53,8 @@ export interface Database {
           transponder_number: string | null
           roi_accepted: boolean | null
           insurance_ack: boolean | null
+          fba_license_number?: string | null
+          fba_synced_at?: string | null
           referent_contract_signed_at?: string | null
           referent_contract_ip?: string | null
           referent_contract_version?: string | null
@@ -83,6 +85,8 @@ export interface Database {
           transponder_number?: string | null
           roi_accepted?: boolean | null
           insurance_ack?: boolean | null
+          fba_license_number?: string | null
+          fba_synced_at?: string | null
           referent_contract_signed_at?: string | null
           referent_contract_ip?: string | null
           referent_contract_version?: string | null
@@ -113,6 +117,8 @@ export interface Database {
           transponder_number?: string | null
           roi_accepted?: boolean | null
           insurance_ack?: boolean | null
+          fba_license_number?: string | null
+          fba_synced_at?: string | null
           referent_contract_signed_at?: string | null
           referent_contract_ip?: string | null
           referent_contract_version?: string | null

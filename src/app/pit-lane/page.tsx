@@ -154,11 +154,10 @@ export default function PitLanePage() {
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`px-3 py-1.5 rounded font-mono text-xs whitespace-nowrap transition-all cursor-pointer ${
-                selectedCategory === cat.id
+              className={`px-3 py-1.5 rounded font-mono text-xs whitespace-nowrap transition-all cursor-pointer ${selectedCategory === cat.id
                   ? 'bg-primary text-black font-bold shadow-[0_0_10px_rgba(255,110,0,0.3)]'
                   : 'bg-surface hover:bg-surface-high border border-[#353535] text-foreground/60 hover:text-white'
-              }`}
+                }`}
             >
               {cat.label}
             </button>
@@ -191,11 +190,10 @@ export default function PitLanePage() {
             return (
               <article
                 key={item.id}
-                className={`premium-card p-6 md:p-8 rounded-lg border transition-all relative overflow-hidden ${
-                  item.is_pinned
+                className={`premium-card p-6 md:p-8 rounded-lg border transition-all relative overflow-hidden ${item.is_pinned
                     ? 'border-primary/50 shadow-[0_0_25px_rgba(255,110,0,0.1)] ring-1 ring-primary/20'
                     : 'border-[#353535] hover:border-[#454545]'
-                }`}
+                  }`}
               >
                 {/* Ligne supérieure : Catégorie, Épinglé, Date */}
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">

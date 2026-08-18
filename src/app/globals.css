@@ -113,3 +113,36 @@ input, select, textarea, button {
   transform: skewX(-8deg) translate(0px, 0px);
   box-shadow: 0px 0px 0px #000000;
 }
+
+/* Micro-interactions standardisées sur boutons et éléments d'action */
+.btn-interactive,
+.btn-action {
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.btn-interactive:hover,
+.btn-action:hover {
+  filter: brightness(1.1);
+}
+
+.btn-interactive:active,
+.btn-action:active {
+  transform: scale(0.96);
+}
+
+/* Fluid page transitions */
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-enter {
+  animation: pageEnter 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

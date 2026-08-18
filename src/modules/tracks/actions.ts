@@ -68,7 +68,14 @@ export async function getTracks(): Promise<{ data: TrackItem[]; error: string | 
 }
 
 import { isSuperAdmin } from '../admin/permissions';
-import { ReferentPermissions } from '@/types/models';
+import { ReferentPermissions, TrackClosureType, TrackStatus } from '@/types/models';
+
+export interface UpdateTrackStatusOptions {
+  status?: TrackStatus;
+  closure_reason?: string | null;
+  closure_type?: TrackClosureType | null;
+  reopening_at?: string | null;
+}
 
 /**
  * Met à jour l'état d'ouverture d'une piste (Admins et Référents assignés)
@@ -76,7 +83,7 @@ import { ReferentPermissions } from '@/types/models';
 export async function updateTrackStatus(
   id: string,
   is_open: boolean,
-  status?: 'OPEN' | 'CLOSED' | 'WORK'
+  options?: UpdateTrackStatusOptions | 'OPEN' | 'CLOSED' | 'WORK'
 ): Promise<{ success: boolean; error: string | null; updated?: TrackItem }> {
   try {
     const supabase = await createClient();
@@ -106,13 +113,37 @@ export async function updateTrackStatus(
       return { success: false, error: 'Action non autorisée sur cette piste.' };
     }
 
-    const nextStatus = status || (is_open ? 'OPEN' : 'CLOSED');
+    // Normalisation des options
+    const parsedOptions: UpdateTrackStatusOptions = typeof options === 'string'
+      ? { status: options }
+      : (options || {});
+
+    let nextStatus: TrackStatus = 'OPEN';
+    let closure_reason: string | null = null;
+    let closure_type: TrackClosureType | null = null;
+    let reopening_at: string | null = null;
+
+    if (is_open) {
+      nextStatus = 'OPEN';
+      closure_reason = null;
+      closure_type = null;
+      reopening_at = null;
+    } else {
+      nextStatus = parsedOptions.status || (parsedOptions.closure_type === 'INDEFINITE_WORKS' ? 'WORK' : 'CLOSED');
+      closure_reason = parsedOptions.closure_reason || null;
+      closure_type = parsedOptions.closure_type || (parsedOptions.status === 'WORK' ? 'INDEFINITE_WORKS' : 'DURATION');
+      reopening_at = parsedOptions.reopening_at || null;
+    }
+
     const now = new Date().toISOString();
     const { data, error } = await supabase
       .from('tracks')
       .update({
         is_open,
         status: nextStatus,
+        closure_reason,
+        closure_type,
+        reopening_at,
         updated_at: now,
       })
       .eq('id', id)

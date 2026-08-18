@@ -86,9 +86,9 @@ export default function MemberQrCodeCard({ member, className = '' }: MemberQrCod
 
             <div className="space-y-1 text-xs font-mono">
               <div className="flex items-center gap-1.5 text-foreground/70">
-                <span className="text-foreground/40">Licence :</span>
+                <span className="text-foreground/40">Licence FBA :</span>
                 <span className="font-bold text-primary truncate">
-                  {member.license_number || 'Non renseignée'}
+                  {member.fba_license_number || member.license_number || 'En attente'}
                 </span>
               </div>
 

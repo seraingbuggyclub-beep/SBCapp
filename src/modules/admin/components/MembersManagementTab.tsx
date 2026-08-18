@@ -20,12 +20,14 @@ import {
   Maximize2,
   ShieldAlert,
   Ban,
+  RefreshCw,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { MemberProfile, UserRole, ModulePermissionsMap, getErrorMessage } from '@/types/models';
 import { PermissionsMatrix } from './PermissionsMatrix';
 import { getMemberQrPayload, getMemberQrTheme } from '@/modules/members/utils/qrcode';
 import { blacklistAndRevokeMember } from '../blacklist-actions';
+import { syncAllMembersFbaLicenses, syncMyFbaLicense } from '@/modules/members/fba-sync';
 import BlacklistReasonSelector, {
   getSavedRejectionMessage,
   saveRejectionMessage,
@@ -78,6 +80,55 @@ export default function MembersManagementTab({
   const [revoking, setRevoking] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string>('');
   const [actionSuccess, setActionSuccess] = useState<string>('');
+
+  const [syncingAllFba, setSyncingAllFba] = useState<boolean>(false);
+  const [syncingMemberId, setSyncingMemberId] = useState<string | null>(null);
+
+  const handleSyncAllFba = async () => {
+    setSyncingAllFba(true);
+    setActionError('');
+    setActionSuccess('');
+
+    try {
+      const res = await syncAllMembersFbaLicenses();
+      if (!res.success) {
+        setActionError(res.error || 'Erreur lors de la synchronisation globale FBA');
+      } else {
+        setActionSuccess(res.message || `${res.updatedCount} licences FBA synchronisées.`);
+        if (onRefreshMembers) {
+          onRefreshMembers();
+        }
+        setTimeout(() => setActionSuccess(''), 5000);
+      }
+    } catch (err: unknown) {
+      setActionError(getErrorMessage(err));
+    } finally {
+      setSyncingAllFba(false);
+    }
+  };
+
+  const handleSyncMemberFba = async (memberId: string) => {
+    setSyncingMemberId(memberId);
+    setActionError('');
+    setActionSuccess('');
+
+    try {
+      const res = await syncMyFbaLicense(memberId);
+      if (!res.success) {
+        setActionError(res.error || 'Affiliation FBA introuvable pour ce membre.');
+      } else {
+        setActionSuccess(res.message || 'Licence FBA synchronisée avec succès !');
+        if (onRefreshMembers) {
+          onRefreshMembers();
+        }
+        setTimeout(() => setActionSuccess(''), 5000);
+      }
+    } catch (err: unknown) {
+      setActionError(getErrorMessage(err));
+    } finally {
+      setSyncingMemberId(null);
+    }
+  };
 
   const filteredMembers = useMemo(() => {
     return members.filter((m) => {
@@ -211,7 +262,19 @@ export default function MembersManagementTab({
           />
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+          {canEditMembers && (
+            <button
+              onClick={handleSyncAllFba}
+              disabled={syncingAllFba}
+              className="px-3 py-1.5 rounded bg-primary/15 hover:bg-primary/25 border border-primary/40 text-primary font-mono text-[11px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="Interroger le registre officiel fba-rc.be pour synchroniser tous les numéros de licence des membres"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${syncingAllFba ? 'animate-spin' : ''}`} />
+              <span>{syncingAllFba ? 'Synchro en cours...' : '🔄 Synchro FBA Globale'}</span>
+            </button>
+          )}
+
           {onNavigateToBlacklist && (
             <button
               onClick={onNavigateToBlacklist}
@@ -250,7 +313,7 @@ export default function MembersManagementTab({
           <thead>
             <tr className="bg-surface-dim text-foreground/60 border-b border-[#353535]">
               <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-[10px]">Pilote</th>
-              <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-[10px]">Licence</th>
+              <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-[10px]">Licence FBA</th>
               <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-[10px]">Cotisation</th>
               <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-[10px]">Rôle & Accès</th>
               <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-[10px] text-right">Actions</th>
@@ -285,12 +348,31 @@ export default function MembersManagementTab({
 
                     {/* Licence */}
                     <td className="px-5 py-3.5">
-                      {member.license_number ? (
-                        <span className="font-bold text-white bg-surface px-2 py-0.5 rounded border border-[#353535] text-[11px]">
-                          {formatLicenseBadge(member.license_number)}
-                        </span>
-                      ) : (
-                        <span className="text-foreground/30 italic text-[11px]">Aucune</span>
+                      <div className="flex items-center gap-1.5">
+                        {member.license_number || member.fba_license_number ? (
+                          <span className="font-bold text-white bg-surface px-2 py-0.5 rounded border border-[#353535] text-[11px]">
+                            {formatLicenseBadge(member.fba_license_number || member.license_number)}
+                          </span>
+                        ) : (
+                          <span className="text-foreground/30 italic text-[11px]">Aucune</span>
+                        )}
+
+                        {canEditMembers && (
+                          <button
+                            type="button"
+                            onClick={() => handleSyncMemberFba(member.id)}
+                            disabled={syncingMemberId === member.id}
+                            className="p-1 rounded hover:bg-primary/15 text-foreground/40 hover:text-primary transition-colors cursor-pointer"
+                            title="Synchroniser la licence FBA de ce membre"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${syncingMemberId === member.id ? 'animate-spin text-primary' : ''}`} />
+                          </button>
+                        )}
+                      </div>
+                      {member.fba_synced_at && (
+                        <div className="text-[9px] text-success mt-0.5">
+                          <span>✓ Synchro {new Date(member.fba_synced_at).toLocaleDateString('fr-BE')}</span>
+                        </div>
                       )}
                     </td>
 
@@ -544,10 +626,29 @@ export default function MembersManagementTab({
               </div>
 
               <div className="space-y-2 p-4 rounded-xl bg-surface/30 border border-[#353535]">
-                <div className="flex items-center gap-2 text-foreground/70">
-                  <Hash className="w-3.5 h-3.5 text-primary shrink-0" />
-                  <span>Licence : <strong className="text-white">{formatLicenseBadge(selectedMember.license_number) || 'Non renseigné'}</strong></span>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-foreground/70 min-w-0">
+                    <Hash className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span className="truncate">Licence : <strong className="text-white">{formatLicenseBadge(selectedMember.fba_license_number || selectedMember.license_number) || 'Non renseigné'}</strong></span>
+                  </div>
+                  {canEditMembers && (
+                    <button
+                      type="button"
+                      onClick={() => handleSyncMemberFba(selectedMember.id)}
+                      disabled={syncingMemberId === selectedMember.id}
+                      className="px-2 py-0.5 rounded bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary text-[10px] font-mono flex items-center gap-1 cursor-pointer shrink-0"
+                      title="Synchroniser avec la FBA"
+                    >
+                      <RefreshCw className={`w-2.5 h-2.5 ${syncingMemberId === selectedMember.id ? 'animate-spin' : ''}`} />
+                      <span>Synchro FBA</span>
+                    </button>
+                  )}
                 </div>
+                {selectedMember.fba_synced_at && (
+                  <div className="text-[10px] text-success font-mono">
+                    ✓ Registre FBA synchronisé le {new Date(selectedMember.fba_synced_at).toLocaleDateString('fr-BE')}
+                  </div>
+                )}
                 <div className="flex items-center gap-2 text-foreground/70">
                   <Phone className="w-3.5 h-3.5 text-primary shrink-0" />
                   <span>Tél : <strong className="text-white">{selectedMember.phone || 'Non renseigné'}</strong></span>

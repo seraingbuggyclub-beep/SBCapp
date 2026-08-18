@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useSimulation } from '@/modules/admin/contexts/SimulationContext';
 import { isSuperAdmin } from '@/modules/admin/permissions';
 import { updateMemberProfile } from '@/modules/members/actions';
+import { syncMyFbaLicense } from '@/modules/members/fba-sync';
 import { getMemberRegistrations, getActiveEvents } from '@/modules/events/actions';
 import { getMemberClubLockCode } from '@/modules/payments/actions';
 import AuthForm from '@/modules/members/components/AuthForm';
@@ -41,6 +42,7 @@ import {
   X,
   ExternalLink,
   ChevronRight,
+  RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
 import { ClubEvent, getErrorMessage, MemberProfileUpdateInput } from '@/types/models';
@@ -88,6 +90,9 @@ export default function DashboardPage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const [syncingFba, setSyncingFba] = useState(false);
+  const [fbaMsg, setFbaMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   // Modale de lecture des documents officiels (ROI / Charte)
   const [activeDocModal, setActiveDocModal] = useState<'roi' | 'charte' | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -121,24 +126,21 @@ export default function DashboardPage() {
   const loadMemberData = useCallback(async (userId: string) => {
     setDataLoading(true);
     try {
-      // 1. Inscriptions actives du pilote
-      const { data: regsData } = await getMemberRegistrations(userId);
+      // Parallélisation des requêtes (suppression des waterfalls)
+      const [{ data: regsData }, { data: eventsData }, { lockCode: code }] = await Promise.all([
+        getMemberRegistrations(userId),
+        getActiveEvents(),
+        getMemberClubLockCode(),
+      ]);
+
       if (isMountedRef.current) {
         setRegistrations((regsData || []) as unknown as MemberRegistrationItem[]);
-      }
 
-      // 2. Événements futurs disponibles
-      const { data: eventsData } = await getActiveEvents();
-      if (isMountedRef.current) {
         const regs = (regsData || []) as unknown as Array<{ event_id: string }>;
         const registeredEventIds = regs.map((r) => r.event_id);
         const filteredEvents = (eventsData || []).filter((e) => !registeredEventIds.includes(e.id));
         setUpcomingEvents(filteredEvents);
-      }
 
-      // 3. Récupération du code cadenas club si cotisant
-      const { lockCode: code } = await getMemberClubLockCode();
-      if (isMountedRef.current) {
         setLockCode(code || '4000');
       }
     } catch (err: unknown) {
@@ -213,6 +215,37 @@ export default function DashboardPage() {
     } finally {
       if (isMountedRef.current) {
         setSavingProfile(false);
+      }
+    }
+  };
+
+  const handleSyncFba = async () => {
+    const activeUserId = user?.id || effectiveProfile?.id;
+    if (!activeUserId) return;
+    setSyncingFba(true);
+    setFbaMsg(null);
+
+    try {
+      const res = await syncMyFbaLicense(activeUserId);
+      if (!res.success) {
+        setFbaMsg({ type: 'error', text: res.error || 'Affiliation non trouvée sur fba-rc.be' });
+      } else {
+        if (res.licenseNumber) {
+          setLicenseNumber(res.licenseNumber);
+        }
+        await refreshAuth();
+        setFbaMsg({ type: 'success', text: res.message || 'Licence FBA synchronisée avec succès !' });
+        setTimeout(() => {
+          if (isMountedRef.current) setFbaMsg(null);
+        }, 5000);
+      }
+    } catch (err: unknown) {
+      if (isMountedRef.current) {
+        setFbaMsg({ type: 'error', text: getErrorMessage(err) });
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setSyncingFba(false);
       }
     }
   };
@@ -303,7 +336,7 @@ export default function DashboardPage() {
           <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-foreground/50 mt-1">
             <span>{user?.email || effectiveProfile?.email}</span>
             <span>•</span>
-            <span>Licence FBA : <strong className="text-white">{effectiveProfile?.license_number || 'Non renseignée'}</strong></span>
+            <span>Licence FBA : <strong className="text-white">{effectiveProfile?.fba_license_number || effectiveProfile?.license_number || 'Non renseignée'}</strong></span>
             <span>•</span>
             <span
               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border ${
@@ -759,25 +792,75 @@ export default function DashboardPage() {
           </div>
 
           {/* Section 3 : Paramètres Piste & Licences */}
-          <div className="pt-2 border-t border-[#353535]/60">
-            <h3 className="text-xs font-mono uppercase tracking-wider text-primary font-bold mb-3 flex items-center gap-1.5">
-              <span>3. Paramètres Course & Piste</span>
-            </h3>
+          <div className="pt-2 border-t border-[#353535]/60 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <h3 className="text-xs font-mono uppercase tracking-wider text-primary font-bold flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-primary" />
+                <span>3. Paramètres Course & Licences FBA</span>
+              </h3>
+              <button
+                type="button"
+                onClick={handleSyncFba}
+                disabled={syncingFba}
+                className="px-3 py-1.5 rounded bg-primary/10 hover:bg-primary/20 border border-primary/40 hover:border-primary text-primary font-mono text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 self-start sm:self-auto disabled:opacity-50"
+                title="Interroger le registre officiel fba-rc.be pour mettre à jour votre numéro d'affiliation"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${syncingFba ? 'animate-spin' : ''}`} />
+                <span>{syncingFba ? 'Synchronisation FBA...' : '🔄 Synchroniser avec la FBA'}</span>
+              </button>
+            </div>
+
+            {/* Notification de synchronisation FBA */}
+            {fbaMsg && (
+              <div
+                className={`p-3 rounded font-mono text-xs flex items-center gap-2 animate-fade-in ${
+                  fbaMsg.type === 'success'
+                    ? 'bg-success/15 border border-success/30 text-success'
+                    : 'bg-secondary/15 border border-secondary/30 text-secondary'
+                }`}
+              >
+                {fbaMsg.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                )}
+                <span>{fbaMsg.text}</span>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/60 mb-1">
-                  Numéro de Licence FBA
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-foreground/60">
+                    Numéro de Licence FBA
+                  </label>
+                  {effectiveProfile?.fba_synced_at ? (
+                    <span className="text-[9px] font-mono text-success flex items-center gap-1">
+                      <CheckCircle2 className="w-2.5 h-2.5" /> Synchro FBA le {new Date(effectiveProfile.fba_synced_at).toLocaleDateString('fr-BE')}
+                    </span>
+                  ) : effectiveProfile?.license_number ? (
+                    <span className="text-[9px] font-mono text-foreground/50">
+                      Édition manuelle
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-mono text-yellow-400">
+                      Non synchronisé
+                    </span>
+                  )}
+                </div>
                 <div className="relative">
                   <Hash className="w-3.5 h-3.5 text-foreground/40 absolute left-2.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     value={licenseNumber}
                     onChange={(e) => setLicenseNumber(e.target.value)}
-                    placeholder="Ex: 1042-BE"
+                    placeholder="Ex: 143-52"
                     className="w-full bg-background border border-[#353535] rounded pl-8 pr-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
                   />
                 </div>
+                <p className="text-[9px] font-mono text-foreground/40 mt-1">
+                  Récupéré automatiquement depuis fba-rc.be ou modifiable manuellement.
+                </p>
               </div>
 
               <div>
@@ -794,6 +877,9 @@ export default function DashboardPage() {
                     className="w-full bg-background border border-[#353535] rounded pl-8 pr-3 py-2 text-xs font-mono text-primary font-bold focus:outline-none focus:border-primary"
                   />
                 </div>
+                <p className="text-[9px] font-mono text-foreground/40 mt-1">
+                  Nécessaire pour le chronométrage officiel des courses et entraînements.
+                </p>
               </div>
             </div>
           </div>

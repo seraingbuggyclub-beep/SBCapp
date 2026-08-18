@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { TrackItem } from '@/types/models';
 import { getTracks, updateTrackStatus } from '../actions';
-import { Flag, CheckCircle2, AlertTriangle, RefreshCw, Clock, ShieldCheck, Zap, Lock } from 'lucide-react';
+import { Flag, CheckCircle2, AlertTriangle, RefreshCw, Clock, ShieldCheck, Zap, Lock, Wrench } from 'lucide-react';
 import { usePermissions } from '@/modules/admin/hooks/usePermissions';
 import { useAuth } from '@/hooks/useAuth';
+import TrackClosureModal from './TrackClosureModal';
 
 interface AdminTracksTabProps {
   canEdit?: boolean;
@@ -16,12 +17,13 @@ export default function AdminTracksTab({ canEdit = true, isSimulated = false }: 
   const [tracks, setTracks] = useState<TrackItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [closingTrack, setClosingTrack] = useState<TrackItem | null>(null);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   
   const { user, profile } = useAuth();
   const permissions = usePermissions(user, profile);
 
-  const isSuperOrAdmin = permissions.isSuperAdmin || permissions.isAdmin || profile?.role === 'admin' || profile?.role === 'super_admin' || canEdit;
+  const isSuperOrAdmin = permissions.isSuperAdmin || permissions.isAdmin || profile?.role === 'admin' || canEdit;
   const canEditTrack = (trackId: string): boolean => {
     if (isSuperOrAdmin) return true;
     return permissions.canManageTrack(trackId);
@@ -53,24 +55,38 @@ export default function AdminTracksTab({ canEdit = true, isSimulated = false }: 
       return;
     }
 
-    const nextState = !track.is_open;
+    // Si la piste est actuellement ouverte, ouvrir la modale de fermeture pour choisir la durée
+    if (track.is_open) {
+      setClosingTrack(track);
+      return;
+    }
+
+    // Si la piste est fermée, réouverture immédiate
     setUpdatingId(track.id);
 
     // Optimistic update
     setTracks((prev) =>
       prev.map((t) =>
         t.id === track.id
-          ? { ...t, is_open: nextState, updated_at: new Date().toISOString() }
+          ? {
+              ...t,
+              is_open: true,
+              status: 'OPEN',
+              closure_reason: null,
+              closure_type: null,
+              reopening_at: null,
+              updated_at: new Date().toISOString(),
+            }
           : t
       )
     );
 
-    const res = await updateTrackStatus(track.id, nextState);
+    const res = await updateTrackStatus(track.id, true);
     setUpdatingId(null);
 
     if (res.success) {
       setMessage({
-        text: `Piste "${track.name}" ${nextState ? 'ouverte' : 'fermée / en travaux'} avec succès.`,
+        text: `Piste "${track.name}" rouverte avec succès.`,
         type: 'success',
       });
       setTimeout(() => setMessage(null), 3000);
@@ -79,6 +95,50 @@ export default function AdminTracksTab({ canEdit = true, isSimulated = false }: 
       setTracks((prev) =>
         prev.map((t) => (t.id === track.id ? { ...t, is_open: track.is_open } : t))
       );
+      setMessage({ text: `Erreur : ${res.error}`, type: 'error' });
+      setTimeout(() => setMessage(null), 4000);
+    }
+  };
+
+  const handleConfirmClosure = async (
+    trackId: string,
+    options: {
+      closure_type: import('@/types/models').TrackClosureType;
+      reopening_at: string | null;
+      closure_reason: string | null;
+    }
+  ) => {
+    setUpdatingId(trackId);
+
+    // Optimistic update
+    setTracks((prev) =>
+      prev.map((t) =>
+        t.id === trackId
+          ? {
+              ...t,
+              is_open: false,
+              status: options.closure_type === 'INDEFINITE_WORKS' ? 'WORK' : 'CLOSED',
+              closure_type: options.closure_type,
+              reopening_at: options.reopening_at,
+              closure_reason: options.closure_reason,
+              updated_at: new Date().toISOString(),
+            }
+          : t
+      )
+    );
+
+    const res = await updateTrackStatus(trackId, false, options);
+    setUpdatingId(null);
+    setClosingTrack(null);
+
+    if (res.success) {
+      setMessage({
+        text: `Piste mise à l'arrêt avec succès.`,
+        type: 'success',
+      });
+      setTimeout(() => setMessage(null), 3000);
+    } else {
+      fetchTracks();
       setMessage({ text: `Erreur : ${res.error}`, type: 'error' });
       setTimeout(() => setMessage(null), 4000);
     }
@@ -203,14 +263,40 @@ export default function AdminTracksTab({ canEdit = true, isSimulated = false }: 
                 </div>
               </div>
 
+              {/* Si piste fermée : Détails du motif et réouverture */}
+              {!isOpen && (
+                <div className="bg-surface-dim/90 p-3 rounded-lg border border-red-500/20 text-xs font-mono space-y-1">
+                  <div className="flex items-center gap-2 text-foreground/80 font-bold">
+                    {track.closure_type === 'INDEFINITE_WORKS' ? (
+                      <span className="text-amber-400 flex items-center gap-1.5">
+                        <Wrench className="w-3.5 h-3.5" />
+                        Travaux en cours (durée indéterminée)
+                      </span>
+                    ) : track.reopening_at ? (
+                      <span className="text-red-300 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-primary" />
+                        Réouverture estimée : {new Date(track.reopening_at).toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' })} ({new Date(track.reopening_at).toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit' })})
+                      </span>
+                    ) : (
+                      <span className="text-red-400">Fermeture programmée</span>
+                    )}
+                  </div>
+                  {track.closure_reason && (
+                    <p className="text-[11px] text-foreground/60 italic pl-5">
+                      Motif : {track.closure_reason}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Toggle Switch Button */}
               <div className="pt-2 border-t border-[#353535] flex items-center justify-between gap-3">
                 <span className="text-xs font-mono text-foreground/60">
                   {!isTrackManageable
                     ? 'Modification non autorisée (Réservée aux référents assignés)'
                     : isOpen
-                    ? 'Basculer vers Fermée / Travaux'
-                    : 'Basculer vers Piste Ouverte'}
+                    ? 'Mettre à l\'arrêt (Définir durée / travaux)'
+                    : 'Réouvrir la piste immédiatement'}
                 </span>
 
                 <button
@@ -238,6 +324,15 @@ export default function AdminTracksTab({ canEdit = true, isSimulated = false }: 
           );
         })}
       </div>
+
+      {/* Modal de fermeture avec paramétrage durée / motif */}
+      <TrackClosureModal
+        track={closingTrack}
+        isOpen={Boolean(closingTrack)}
+        onClose={() => setClosingTrack(null)}
+        onConfirm={handleConfirmClosure}
+        loading={Boolean(updatingId)}
+      />
     </div>
   );
 }

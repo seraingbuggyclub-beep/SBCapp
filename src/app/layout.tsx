@@ -5,6 +5,7 @@ import ServiceWorkerRegister from "@/components/pwa/ServiceWorkerRegister";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SimulationProvider } from "@/modules/admin/contexts/SimulationContext";
 import { PresenceZoneProvider } from "@/modules/presence/contexts/PresenceZoneContext";
+import NextTopLoader from "nextjs-toploader";
 
 export const viewport: Viewport = {
   themeColor: "#ff6e00",
@@ -40,6 +41,17 @@ export default function RootLayout({
   return (
     <html lang="fr" className="h-full antialiased dark">
       <body className="min-h-full flex flex-col bg-background text-foreground selection:bg-primary selection:text-black">
+        <NextTopLoader
+          color="#ff6e00"
+          initialPosition={0.08}
+          crawlSpeed={200}
+          height={3}
+          crawl={true}
+          showSpinner={false}
+          easing="ease"
+          speed={200}
+          shadow="0 0 10px #ff6e00,0 0 5px #ff6e00"
+        />
         <ServiceWorkerRegister />
         <AuthProvider>
           <SimulationProvider>

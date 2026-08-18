@@ -1,10 +1,18 @@
 'use server';
 
+import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { MemberProfile, MemberProfileCreateInput, MemberProfileUpdateInput, MemberUpdate } from '@/types/models';
 
-export async function getMemberProfile(userId: string): Promise<{ data: MemberProfile | null; error: string | null }> {
+export const getCurrentUser = cache(async () => {
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) return null;
+  return user;
+});
+
+export const getMemberProfile = cache(async (userId: string): Promise<{ data: MemberProfile | null; error: string | null }> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('sbc_members')
@@ -16,7 +24,7 @@ export async function getMemberProfile(userId: string): Promise<{ data: MemberPr
     return { data: null, error: error.message };
   }
   return { data: (data as MemberProfile) || null, error: null };
-}
+});
 
 export async function createMemberProfile(profile: MemberProfileCreateInput): Promise<{ data: MemberProfile | null; error: string | null }> {
   const supabase = await createClient();
@@ -70,6 +78,12 @@ export async function updateMemberProfile(profile: MemberProfileUpdateInput): Pr
 
   if (profile.insurance_ack !== undefined) {
     updateData.insurance_ack = profile.insurance_ack;
+  }
+  if (profile.fba_license_number !== undefined) {
+    updateData.fba_license_number = profile.fba_license_number;
+  }
+  if (profile.fba_synced_at !== undefined) {
+    updateData.fba_synced_at = profile.fba_synced_at;
   }
 
   const { data, error } = await supabase

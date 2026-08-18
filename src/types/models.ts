@@ -60,6 +60,8 @@ export interface MemberProfileUpdateInput {
   transponder_number?: string | null;
   roi_accepted?: boolean;
   insurance_ack?: boolean;
+  fba_license_number?: string | null;
+  fba_synced_at?: string | null;
   referent_contract_signed_at?: string | null;
   referent_contract_ip?: string | null;
   referent_contract_version?: string | null;
@@ -245,6 +247,7 @@ export type TrackInsert = TablesInsert<'tracks'>;
 export type TrackUpdate = TablesUpdate<'tracks'>;
 
 export type TrackStatus = 'OPEN' | 'CLOSED' | 'WORK';
+export type TrackClosureType = 'DURATION' | 'INDEFINITE_WORKS' | 'WEATHER';
 
 export interface TrackItem {
   id: string;
@@ -254,6 +257,9 @@ export interface TrackItem {
   status?: TrackStatus;
   is_open: boolean;
   description?: string | null;
+  closure_reason?: string | null;
+  closure_type?: TrackClosureType | null;
+  reopening_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 }

@@ -129,7 +129,7 @@ export default function CommunicationsTab({ canEdit, isSimulated }: Communicatio
       return;
     }
     if (!canEdit) return;
-    if (!window.confirm('Voulez-vous vraiment supprimer cette annonce du babillard ?')) return;
+    if (!window.confirm('Voulez-vous vraiment supprimer cette annonce du brief ?')) return;
 
     const { success, error } = await deleteAnnouncement(id);
     if (success) {
@@ -280,7 +280,7 @@ export default function CommunicationsTab({ canEdit, isSimulated }: Communicatio
                 />
                 <span className="text-xs text-white font-bold flex items-center gap-1">
                   <Pin className="w-3.5 h-3.5 text-secondary" />
-                  Épingler en haut du Babillard (Urgent / Prioritaire)
+                  Épingler en haut du Brief (Urgent / Prioritaire)
                 </span>
               </label>
             </div>

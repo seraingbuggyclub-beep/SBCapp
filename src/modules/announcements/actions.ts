@@ -36,7 +36,7 @@ const FALLBACK_ANNOUNCEMENTS: ClubAnnouncement[] = [
   },
 ];
 
-// Récupérer toutes les annonces publiques (Babillard Pit-Lane)
+// Récupérer toutes les annonces publiques (Brief Pit-Lane)
 export async function getAnnouncements(): Promise<{ data: ClubAnnouncement[]; error: string | null }> {
   try {
     const supabase = await createClient();

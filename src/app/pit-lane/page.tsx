@@ -92,13 +92,13 @@ export default function PitLanePage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8 animate-fade-in">
-      {/* 1. Header Babillard */}
+      {/* 1. Header Brief Pit-Lane */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#353535] pb-6">
         <div>
           <div className="flex items-center gap-2.5">
             <Radio className="w-6 h-6 text-primary animate-pulse" />
             <h1 className="font-anybody font-black text-2xl md:text-3xl uppercase tracking-tight sport-skew text-white">
-              Pit-Lane : <span className="text-primary">Le Babillard</span>
+              Pit-Lane : <span className="text-primary">Le Brief</span>
             </h1>
           </div>
           <p className="text-xs font-mono text-foreground/50 mt-1">

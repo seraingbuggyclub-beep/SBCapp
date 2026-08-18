@@ -196,7 +196,7 @@ export type ClubConfigInsert = TablesInsert<'sbc_club_config'>;
 export type ClubConfigUpdate = TablesUpdate<'sbc_club_config'>;
 
 // ==========================================
-// BABILLARD PIT-LANE & COMMUNICATIONS DU COMITÉ
+// BRIEF PIT-LANE & COMMUNICATIONS DU COMITÉ
 // ==========================================
 export type AnnouncementCategory = 'info_piste' | 'travaux' | 'briefing_course' | 'vie_du_club';
 

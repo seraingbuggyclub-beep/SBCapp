@@ -134,7 +134,7 @@ export default function PermissionsTab({
     {
       id: 'referent',
       label: 'Référent Club (Piste Astro & Présences)',
-      description: 'Droits délégués : gestion Piste Astro 1/10, Registre Présences FBA, Babillard.',
+      description: 'Droits délégués : gestion Piste Astro 1/10, Registre Présences FBA, Brief Pit-Lane.',
       profile: {
         id: 'sim-referent',
         email: 'referent.astro@example.com',

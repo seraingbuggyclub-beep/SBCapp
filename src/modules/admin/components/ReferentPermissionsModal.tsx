@@ -315,7 +315,7 @@ export default function ReferentPermissionsModal({
               />
               <span className="text-xs text-foreground/80 flex items-center gap-2">
                 <Radio className="w-3.5 h-3.5 text-primary" />
-                Babillard Pit-Lane (Publication d'annonces de piste)
+                Brief Pit-Lane (Publication d'annonces de piste)
               </span>
             </label>
           </div>

@@ -271,32 +271,32 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Navigation par Onglets */}
-      <div className="flex items-center gap-2 border-b border-[#353535] pb-2 overflow-x-auto scrollbar-none">
+      {/* Navigation par Onglets (Affichage multi-lignes sans scroll horizontal) */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-[#353535] pb-3">
         <button
           onClick={() => setActiveTab('members')}
-          className={`h-10 px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer shrink-0 ${
+          className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
             activeTab === 'members'
               ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
               : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
           }`}
         >
-          <Users className="w-4 h-4" />
+          <Users className="w-3.5 h-3.5" />
           <span className="transform skew-x-8">Pilotes ({members.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('blacklist')}
-          className={`h-10 px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer shrink-0 ${
+          className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
             activeTab === 'blacklist'
               ? 'bg-secondary text-white shadow-[2px_2px_0px_#000]'
               : 'bg-surface border border-secondary/40 text-secondary hover:bg-secondary/20'
           }`}
         >
-          <ShieldAlert className="w-4 h-4 text-secondary" />
-          <span className="transform skew-x-8 flex items-center gap-1.5">
+          <ShieldAlert className="w-3.5 h-3.5 text-secondary" />
+          <span className="transform skew-x-8 flex items-center gap-1">
             Liste Noire
-            <span className="px-1.5 py-0.2 rounded bg-secondary/30 text-[9px] font-mono uppercase font-bold text-white">
+            <span className="px-1 py-0.2 rounded bg-secondary/30 text-[8px] font-mono uppercase font-bold text-white">
               Privé
             </span>
           </span>
@@ -304,71 +304,71 @@ export default function AdminPage() {
 
         <button
           onClick={() => setActiveTab('treasury')}
-          className={`h-10 px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer shrink-0 ${
+          className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
             activeTab === 'treasury'
               ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
               : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
           }`}
         >
-          <Coins className="w-4 h-4" />
+          <Coins className="w-3.5 h-3.5" />
           <span className="transform skew-x-8">Trésorerie & Cotisations</span>
         </button>
 
         <button
           onClick={() => setActiveTab('tracks')}
-          className={`h-10 px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer shrink-0 ${
+          className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
             activeTab === 'tracks'
               ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
               : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
           }`}
         >
-          <Flag className="w-4 h-4" />
+          <Flag className="w-3.5 h-3.5" />
           <span className="transform skew-x-8">Pistes</span>
         </button>
 
         <button
           onClick={() => setActiveTab('communications')}
-          className={`h-10 px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer shrink-0 ${
+          className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
             activeTab === 'communications'
               ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
               : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
           }`}
         >
-          <Radio className="w-4 h-4" />
-          <span className="transform skew-x-8">Babillard Pit-Lane</span>
+          <Radio className="w-3.5 h-3.5" />
+          <span className="transform skew-x-8">Brief Pit-Lane</span>
         </button>
 
         <button
           onClick={() => setActiveTab('permissions')}
-          className={`h-10 px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer shrink-0 ${
+          className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
             activeTab === 'permissions'
               ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
               : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
           }`}
         >
-          <Ghost className="w-4 h-4" />
+          <Ghost className="w-3.5 h-3.5" />
           <span className="transform skew-x-8">Permissions & Simulateur</span>
         </button>
 
         <button
           onClick={() => setActiveTab('cadenas')}
-          className={`h-10 px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer shrink-0 ${
+          className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
             activeTab === 'cadenas'
               ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
               : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
           }`}
         >
-          <Key className="w-4 h-4" />
+          <Key className="w-3.5 h-3.5" />
           <span className="transform skew-x-8">Code Cadenas</span>
         </button>
 
         <button
           onClick={fetchAdminData}
           disabled={loading}
-          className="h-10 ml-auto p-2 bg-surface hover:bg-surface-high border border-[#353535] rounded text-foreground/60 hover:text-white cursor-pointer transition-colors disabled:opacity-40 shrink-0"
+          className="h-9 ml-auto p-2 bg-surface hover:bg-surface-high border border-[#353535] rounded text-foreground/60 hover:text-white cursor-pointer transition-colors disabled:opacity-40"
           title="Actualiser les données"
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
 

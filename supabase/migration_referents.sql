@@ -4,11 +4,14 @@
 -- Seraing Buggy Club (ASBL)
 -- ==============================================================================
 
--- 1. Évolution des rôles sur sbc_members
--- Migration des éventuels anciens rôles temporaires
-UPDATE public.sbc_members
-SET role = 'referent'
-WHERE role IN ('secondary_admin', 'admin_secondary');
+-- 1. Ajout sécurisé de la valeur 'referent' dans le type ENUM sbc_role
+DO $$
+BEGIN
+    ALTER TYPE public.sbc_role ADD VALUE IF NOT EXISTS 'referent';
+EXCEPTION
+    WHEN duplicate_object THEN null;
+    WHEN undefined_object THEN null;
+END $$;
 
 -- 2. Ajout de la colonne referent_permissions (JSONB)
 ALTER TABLE public.sbc_members
@@ -68,10 +71,10 @@ CREATE POLICY "tracks_admin_and_referents_update" ON public.tracks
             SELECT 1 FROM public.sbc_members
             WHERE sbc_members.id = auth.uid()
             AND (
-                sbc_members.role = 'admin'
+                sbc_members.role::text = 'admin'
                 OR sbc_members.email = 'stefga1@gmail.com'
                 OR (
-                    sbc_members.role = 'referent'
+                    sbc_members.role::text = 'referent'
                     AND (sbc_members.referent_permissions->>'can_open_close_tracks')::boolean = true
                     AND sbc_members.referent_permissions->'allowed_track_ids' ? tracks.id
                 )

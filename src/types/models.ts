@@ -586,6 +586,39 @@ export interface SecuredEmailAudience {
 }
 
 // ==========================================
+// LISTE NOIRE PRIVÉE (BLACKLIST)
+// ==========================================
+export interface BlacklistEntry {
+  id: string;
+  email?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  license_number?: string | null;
+  internal_reason: string;
+  rejection_message: string;
+  blocked_by?: string | null;
+  created_at: string;
+  blocked_by_member?: {
+    first_name: string;
+    last_name: string;
+  } | null;
+}
+
+export interface CreateBlacklistInput {
+  email?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  license_number?: string | null;
+  internal_reason: string;
+  rejection_message?: string;
+}
+
+export interface BlacklistCheckResult {
+  isBlacklisted: boolean;
+  message?: string;
+}
+
+// ==========================================
 // HELPERS D'ERREUR TYPESAFE
 // ==========================================
 export function getErrorMessage(err: unknown): string {

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { createMemberProfile } from '../actions';
+import { checkBlacklistStatus } from '@/modules/admin/blacklist-actions';
 import { 
   KeyRound, 
   Mail, 
@@ -13,6 +14,7 @@ import {
   MapPin, 
   Calendar, 
   Hash, 
+  ShieldAlert,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -51,6 +53,15 @@ export default function AuthForm() {
 
     try {
       if (isSignUp) {
+        // 1. Contrôle préalable de la liste noire privée (Organe d'Administration)
+        const blacklistCheck = await checkBlacklistStatus(email, firstName, lastName);
+        if (blacklistCheck.isBlacklisted) {
+          throw new Error(
+            blacklistCheck.message ||
+              "Votre demande d'inscription n'a pas été retenue par l'Organe d'Administration du Seraing Buggy Club (ASBL), conformément aux statuts du club."
+          );
+        }
+
         // Validation stricte de l'acquittement assurance FBA
         if (!insuranceAck) {
           throw new Error("Vous devez obligatoirement accepter l'engagement d'enregistrement pour être couvert par l'assurance FBA.");

@@ -18,13 +18,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { MemberProfile, UserRole, ModulePermissionsMap } from '@/types/models';
 
 import MembersManagementTab from '@/modules/admin/components/MembersManagementTab';
+import BlacklistTab from '@/modules/admin/components/BlacklistTab';
 import PermissionsTab from '@/modules/admin/components/PermissionsTab';
 import AccessCodeTab from '@/modules/admin/components/AccessCodeTab';
 import CommunicationsTab from '@/modules/admin/components/CommunicationsTab';
 import AdminTracksTab from '@/modules/tracks/components/AdminTracksTab';
 import TreasuryTab from '@/modules/admin/components/TreasuryTab';
 
-type AdminTab = 'members' | 'treasury' | 'tracks' | 'communications' | 'permissions' | 'cadenas';
+type AdminTab = 'members' | 'blacklist' | 'treasury' | 'tracks' | 'communications' | 'permissions' | 'cadenas';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -284,6 +285,23 @@ export default function AdminPage() {
         </button>
 
         <button
+          onClick={() => setActiveTab('blacklist')}
+          className={`px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
+            activeTab === 'blacklist'
+              ? 'bg-secondary text-white shadow-[2px_2px_0px_#000]'
+              : 'bg-surface border border-secondary/40 text-secondary hover:bg-secondary/20'
+          }`}
+        >
+          <ShieldAlert className="w-4 h-4 text-secondary" />
+          <span className="transform skew-x-8 flex items-center gap-1.5">
+            Liste Noire
+            <span className="px-1.5 py-0.2 rounded bg-secondary/30 text-[9px] font-mono uppercase font-bold text-white">
+              Privé
+            </span>
+          </span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('treasury')}
           className={`px-4 py-2 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-2 cursor-pointer ${
             activeTab === 'treasury'
@@ -366,7 +384,13 @@ export default function AdminPage() {
           onUpdateStatus={handleUpdateStatus}
           onSavePermissions={handleSavePermissions}
           onToggleExpandedMember={setExpandedMemberId}
+          onNavigateToBlacklist={() => setActiveTab('blacklist')}
+          onRefreshMembers={fetchAdminData}
         />
+      )}
+
+      {activeTab === 'blacklist' && (
+        <BlacklistTab />
       )}
 
       {activeTab === 'treasury' && (

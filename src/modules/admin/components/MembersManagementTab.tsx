@@ -18,11 +18,14 @@ import {
   Shield,
   QrCode,
   Maximize2,
+  ShieldAlert,
+  Ban,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { MemberProfile, UserRole, ModulePermissionsMap } from '@/types/models';
+import { MemberProfile, UserRole, ModulePermissionsMap, getErrorMessage } from '@/types/models';
 import { PermissionsMatrix } from './PermissionsMatrix';
 import { getMemberQrPayload, getMemberQrTheme } from '@/modules/members/utils/qrcode';
+import { blacklistAndRevokeMember } from '../blacklist-actions';
 import QrCodeModal from '@/modules/members/components/QrCodeModal';
 
 interface MembersManagementTabProps {
@@ -36,6 +39,8 @@ interface MembersManagementTabProps {
   onUpdateStatus: (memberId: string, currentStatus: string) => void;
   onSavePermissions: (memberId: string, role: string, newPerms: Record<string, string[]>) => void;
   onToggleExpandedMember: (memberId: string | null) => void;
+  onNavigateToBlacklist?: () => void;
+  onRefreshMembers?: () => void;
 }
 
 export default function MembersManagementTab({
@@ -49,11 +54,23 @@ export default function MembersManagementTab({
   onUpdateStatus,
   onSavePermissions,
   onToggleExpandedMember,
+  onNavigateToBlacklist,
+  onRefreshMembers,
 }: MembersManagementTabProps) {
   const [selectedMember, setSelectedMember] = useState<MemberProfile | null>(null);
   const [qrModalMember, setQrModalMember] = useState<MemberProfile | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
+
+  // Modale de révocation et mise sur liste noire
+  const [blacklistModalMember, setBlacklistModalMember] = useState<MemberProfile | null>(null);
+  const [internalReason, setInternalReason] = useState<string>('');
+  const [rejectionMessage, setRejectionMessage] = useState<string>(
+    "Votre demande d'inscription n'a pas été retenue par l'Organe d'Administration du Seraing Buggy Club (ASBL), conformément aux statuts du club."
+  );
+  const [revoking, setRevoking] = useState<boolean>(false);
+  const [actionError, setActionError] = useState<string>('');
+  const [actionSuccess, setActionSuccess] = useState<string>('');
 
   const filteredMembers = useMemo(() => {
     return members.filter((m) => {
@@ -95,8 +112,70 @@ export default function MembersManagementTab({
     }
   };
 
+  const handleOpenBlacklistModal = (member: MemberProfile) => {
+    setBlacklistModalMember(member);
+    setInternalReason('');
+    setRejectionMessage(
+      "Votre demande d'inscription n'a pas été retenue par l'Organe d'Administration du Seraing Buggy Club (ASBL), conformément aux statuts du club."
+    );
+    setActionError('');
+    setActionSuccess('');
+  };
+
+  const handleConfirmBlacklist = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!blacklistModalMember) return;
+    if (!internalReason.trim()) {
+      setActionError('Le motif interne privé est obligatoire.');
+      return;
+    }
+
+    setRevoking(true);
+    setActionError('');
+    setActionSuccess('');
+
+    try {
+      const { success, error } = await blacklistAndRevokeMember(
+        blacklistModalMember.id,
+        internalReason,
+        rejectionMessage
+      );
+
+      if (!success || error) throw new Error(error || 'Erreur lors de la révocation.');
+
+      setActionSuccess(`Le membre ${blacklistModalMember.first_name} ${blacklistModalMember.last_name} a été révoqué et ajouté à la liste noire.`);
+      setBlacklistModalMember(null);
+      if (selectedMember?.id === blacklistModalMember.id) {
+        setSelectedMember(null);
+      }
+      onUpdateStatus(blacklistModalMember.id, 'expired');
+      if (onRefreshMembers) {
+        onRefreshMembers();
+      }
+      setTimeout(() => setActionSuccess(''), 4000);
+    } catch (err: unknown) {
+      setActionError(getErrorMessage(err));
+    } finally {
+      setRevoking(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Alertes d'action */}
+      {actionSuccess && (
+        <div className="p-3 rounded bg-success/15 border border-success/30 text-success text-xs font-mono flex items-center gap-2 animate-fade-in">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span>{actionSuccess}</span>
+        </div>
+      )}
+      {actionError && (
+        <div className="p-3 rounded bg-secondary/15 border border-secondary/30 text-secondary text-xs font-mono flex items-center gap-2 animate-fade-in">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{actionError}</span>
+        </div>
+      )}
+
       {/* Barre de Recherche et Filtres */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-surface-dim p-4 rounded-lg border border-[#353535]">
         <div className="relative w-full sm:w-80">
@@ -111,6 +190,16 @@ export default function MembersManagementTab({
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+          {onNavigateToBlacklist && (
+            <button
+              onClick={onNavigateToBlacklist}
+              className="px-3 py-1.5 rounded bg-secondary/15 hover:bg-secondary/25 border border-secondary/40 text-secondary font-anybody font-bold uppercase text-[11px] tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer"
+            >
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <span className="transform skew-x-8">Liste Noire</span>
+            </button>
+          )}
+
           <div className="flex items-center gap-1.5 text-xs font-mono">
             <span className="text-foreground/50 text-[11px]">Rôle :</span>
             <select
@@ -260,7 +349,7 @@ export default function MembersManagementTab({
                       </div>
                     </td>
 
-                    {/* Actions : QR Code & Fiche Pilote */}
+                    {/* Actions : QR Code & Fiche Pilote & Blacklist */}
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
@@ -283,6 +372,15 @@ export default function MembersManagementTab({
                         >
                           <Eye className="w-3.5 h-3.5 text-primary" />
                           <span className="hidden md:inline">Voir</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleOpenBlacklistModal(member)}
+                          className="p-1.5 rounded bg-surface hover:bg-secondary/20 border border-[#353535] hover:border-secondary/40 text-foreground/50 hover:text-secondary cursor-pointer transition-colors inline-flex items-center gap-1 text-[10px]"
+                          title="Révoquer & Ajouter à la liste noire"
+                        >
+                          <Ban className="w-3.5 h-3.5 text-secondary" />
+                          <span className="hidden xl:inline">Bloquer</span>
                         </button>
                       </div>
                     </td>
@@ -424,8 +522,100 @@ export default function MembersManagementTab({
                   <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
                   <span>Transpondeur : <strong className="text-white">{selectedMember.transponder_number || 'Aucun'}</strong></span>
                 </div>
+
+                <div className="pt-2 border-t border-[#353535]/50">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleOpenBlacklistModal(selectedMember);
+                    }}
+                    className="w-full py-2.5 rounded bg-secondary/15 hover:bg-secondary/25 border border-secondary/40 text-secondary text-xs font-mono font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <Ban className="w-4 h-4" />
+                    <span>Révoquer & Ajouter à la liste noire</span>
+                  </button>
+                </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modale de Révocation et Mise sur Liste Noire */}
+      {blacklistModalMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-lg premium-card p-6 rounded-lg border border-secondary/50 shadow-2xl relative space-y-4">
+            <div className="flex items-center justify-between border-b border-[#353535] pb-3">
+              <div className="flex items-center gap-2 text-secondary">
+                <ShieldAlert className="w-5 h-5" />
+                <h3 className="font-anybody font-black text-lg uppercase tracking-tight sport-skew text-white">
+                  Révoquer & Mettre sur Liste Noire
+                </h3>
+              </div>
+              <button
+                onClick={() => setBlacklistModalMember(null)}
+                className="p-1 rounded hover:bg-surface text-foreground/50 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3 rounded bg-secondary/10 border border-secondary/30 text-secondary text-xs font-mono space-y-1">
+              <p className="font-bold">
+                ⚠️ Attention : Action disciplinaire immédiate.
+              </p>
+              <p className="text-foreground/80">
+                Le compte de <strong>{blacklistModalMember.first_name} {blacklistModalMember.last_name}</strong> ({blacklistModalMember.email}) sera immédiatement révoqué (cotisation expirée, permissions réinitialisées) et ses futures tentatives d'inscription seront automatiquement bloquées.
+              </p>
+            </div>
+
+            <form onSubmit={handleConfirmBlacklist} className="space-y-3 font-mono text-xs">
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-secondary font-bold mb-1">
+                  Motif interne confidentiel (CA uniquement) *
+                </label>
+                <textarea
+                  required
+                  rows={2}
+                  value={internalReason}
+                  onChange={(e) => setInternalReason(e.target.value)}
+                  placeholder="Ex: Bagarre en tribune lors de la course, non-respect répété du ROI, comportement dangereux..."
+                  className="w-full bg-background border border-secondary/40 rounded px-3 py-2 text-white focus:outline-none focus:border-secondary text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-foreground/50 mb-1">
+                  Message officiel de refus affiché à la personne
+                </label>
+                <textarea
+                  rows={2}
+                  value={rejectionMessage}
+                  onChange={(e) => setRejectionMessage(e.target.value)}
+                  className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-foreground/80 focus:outline-none focus:border-secondary text-xs"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-[#353535] flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBlacklistModalMember(null)}
+                  className="px-4 py-2 rounded bg-surface hover:bg-surface-high border border-[#353535] text-foreground/70 cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={revoking}
+                  className="px-5 py-2 rounded bg-secondary hover:bg-secondary/80 text-white font-anybody font-black uppercase text-xs tracking-wider transition-all sport-skew shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <Ban className="w-4 h-4" />
+                  <span className="transform skew-x-8">
+                    {revoking ? 'Révocation en cours...' : 'Confirmer le blocage définitif'}
+                  </span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

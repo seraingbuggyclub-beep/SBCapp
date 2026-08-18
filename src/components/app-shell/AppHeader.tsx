@@ -3,12 +3,16 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
+import { useSimulation } from '@/modules/admin/contexts/SimulationContext';
 import { LogOut, User, Key, Menu, X, Shield, Radio, Trophy, LayoutDashboard, QrCode } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import QrCodeModal from '@/modules/members/components/QrCodeModal';
 
 export default function AppHeader() {
   const { user, profile, isAdmin, signOut } = useAuth();
+  const { simulatedProfile, isSimulationActive } = useSimulation();
+  const effectiveProfile = simulatedProfile || profile;
+
   const [isOpen, setIsOpen] = useState(false);
   const [headerQrOpen, setHeaderQrOpen] = useState(false);
   const router = useRouter();
@@ -68,26 +72,31 @@ export default function AppHeader() {
           {isAdmin && (
             <Link
               href="/admin"
-              className={`font-anybody text-xs font-bold uppercase tracking-wider transition-colors sport-skew flex items-center gap-1 ${
+              className={`font-anybody text-xs font-bold uppercase tracking-wider transition-colors sport-skew flex items-center gap-1.5 ${
                 pathname.startsWith('/admin') ? 'text-primary' : 'text-foreground/60 hover:text-primary'
               }`}
             >
               <Shield className="w-3.5 h-3.5 text-primary" />
               <span className="transform skew-x-8">Admin</span>
+              {isSimulationActive && (
+                <span className="px-1.5 py-0.2 rounded bg-primary/20 border border-primary/40 text-[9px] font-mono text-primary font-bold">
+                  SIMULATION
+                </span>
+              )}
             </Link>
           )}
         </nav>
 
         {/* Auth / Profile Actions Right */}
         <div className="flex items-center gap-3">
-          {user ? (
+          {(user || simulatedProfile) ? (
             <div className="flex items-center gap-2 sm:gap-3">
               {/* Quick Pass QR Button */}
-              {profile && (
+              {effectiveProfile && (
                 <button
                   onClick={() => setHeaderQrOpen(true)}
                   className={`px-2.5 py-1.5 rounded-lg border text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer ${
-                    profile.payment_status === 'paid'
+                    effectiveProfile.payment_status === 'paid'
                       ? 'bg-green-500/10 border-green-500/30 text-green-400 hover:bg-green-500/20 shadow-[0_0_10px_rgba(34,197,94,0.15)]'
                       : 'bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20'
                   }`}
@@ -99,17 +108,17 @@ export default function AppHeader() {
               )}
 
               {/* Statut Cotisation Badge */}
-              {profile && (
+              {effectiveProfile && (
                 <span
                   className={`hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border ${
-                    profile.payment_status === 'paid'
+                    effectiveProfile.payment_status === 'paid' || effectiveProfile.role === 'admin'
                       ? 'bg-success/15 border-success/30 text-success'
-                      : profile.payment_status === 'expired'
+                      : effectiveProfile.payment_status === 'expired'
                       ? 'bg-secondary/15 border-secondary/30 text-secondary'
                       : 'bg-yellow-500/15 border-yellow-500/30 text-yellow-400'
                   }`}
                 >
-                  {profile.payment_status === 'paid' ? 'Cotisation OK' : 'En attente'}
+                  {effectiveProfile.payment_status === 'paid' || effectiveProfile.role === 'admin' ? 'Cotisation OK' : 'En attente'}
                 </span>
               )}
 
@@ -119,7 +128,7 @@ export default function AppHeader() {
               >
                 <User className="w-3.5 h-3.5 text-primary" />
                 <span className="truncate max-w-28">
-                  {profile?.first_name ? `${profile.first_name}` : user.email?.split('@')[0]}
+                  {effectiveProfile?.first_name ? `${effectiveProfile.first_name}` : user?.email?.split('@')[0]}
                 </span>
               </Link>
 
@@ -171,19 +180,26 @@ export default function AppHeader() {
             {isAdmin && (
               <Link
                 href="/admin"
-                className={`py-2 border-b border-[#353535]/50 flex items-center gap-2 ${
+                className={`py-2 border-b border-[#353535]/50 flex items-center justify-between ${
                   pathname.startsWith('/admin') ? 'text-primary pl-2 border-primary' : 'text-foreground/70 hover:text-primary'
                 }`}
               >
-                <Shield className="w-4 h-4 text-primary" />
-                <span>Administration SBC</span>
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-primary" />
+                  <span>Administration SBC</span>
+                </div>
+                {isSimulationActive && (
+                  <span className="px-1.5 py-0.5 rounded bg-primary/20 border border-primary/40 text-[9px] font-mono text-primary font-bold">
+                    SIMULATION
+                  </span>
+                )}
               </Link>
             )}
           </div>
 
           {/* Auth in Mobile Menu */}
           <div className="pt-4 border-t border-[#353535] flex items-center justify-between">
-            {user ? (
+            {(user || simulatedProfile) ? (
               <div className="flex items-center justify-between w-full">
                 <div className="flex items-center gap-2">
                   <button
@@ -197,7 +213,7 @@ export default function AppHeader() {
                     <span>Pass QR</span>
                   </button>
                   <span className="text-xs font-mono text-foreground/60">
-                    <strong className="text-white">{profile?.first_name || user.email}</strong>
+                    <strong className="text-white">{effectiveProfile?.first_name || user?.email}</strong>
                   </span>
                 </div>
                 <button

@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSimulation } from '@/modules/admin/contexts/SimulationContext';
+import { isSuperAdmin } from '@/modules/admin/permissions';
 import { updateMemberProfile } from '@/modules/members/actions';
 import { getMemberRegistrations, getActiveEvents } from '@/modules/events/actions';
 import { getMemberClubLockCode } from '@/modules/payments/actions';
@@ -58,7 +59,9 @@ export default function DashboardPage() {
 
   // Profil effectif : priorise le profil simulé en mode simulation
   const effectiveProfile = simulatedProfile || profile;
-  const isPaid = effectiveProfile?.payment_status === 'paid';
+  const isSuper = isSuperAdmin(simulatedProfile ? simulatedProfile.email : (user ? user.email : null));
+  const isAdminUser = Boolean(isSuper || effectiveProfile?.role === 'admin');
+  const isPaid = Boolean(effectiveProfile?.payment_status === 'paid' || isAdminUser);
   const hasAgreements = Boolean(effectiveProfile?.roi_accepted && effectiveProfile?.insurance_ack);
 
   const [registrations, setRegistrations] = useState<MemberRegistrationItem[]>([]);

@@ -4,6 +4,7 @@ import React from 'react';
 import { LockOpen } from 'lucide-react';
 import { useSimulation } from '../contexts/SimulationContext';
 import { usePermissions } from '../hooks/usePermissions';
+import { isSuperAdmin } from '../permissions';
 import { MemberProfile } from '@/types/models';
 
 interface LockCodeWidgetProps {
@@ -17,16 +18,20 @@ export default function LockCodeWidget({ initialLockCode, realUserProfile }: Loc
   // Le profil actif de validation est le profil simulé s'il existe, sinon le profil réel
   const activeProfile = simulatedProfile || realUserProfile;
 
-  // Utilisateur simulé pour le hook (pour l'e-mail du Super-Admin)
-  const activeUser = simulatedProfile 
-    ? { email: simulatedProfile.email } 
-    : (realUserProfile ? { email: realUserProfile.email } : null);
+  const isSuper = isSuperAdmin(
+    simulatedProfile ? simulatedProfile.email : (realUserProfile ? realUserProfile.email : null)
+  );
 
-  const permissions = usePermissions(activeUser, activeProfile);
+  // Autorisé si Super Admin, Admin ou Membre en ordre de cotisation ('paid')
+  const isAuthorized = Boolean(
+    isSuper ||
+    activeProfile?.role === 'admin' ||
+    activeProfile?.payment_status === 'paid'
+  );
 
-  // Si l'utilisateur ou le rôle simulé actif n'a pas le droit de consulter la configuration (cadenas)
-  if (!permissions.can('config', 'view')) {
-    return null; // On ne montre rien du tout (exactement comme un visiteur standard)
+  // Si l'utilisateur ou le rôle simulé n'est ni admin ni cotisant en ordre
+  if (!isAuthorized) {
+    return null; // Masqué pour les visiteurs, cotisations expirées/en attente ou pilotes sans accès permanent
   }
 
   // Code cadenas à afficher (reçu du serveur ou valeur de repli sécurisée)

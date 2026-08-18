@@ -60,6 +60,9 @@ export interface MemberProfileUpdateInput {
   transponder_number?: string | null;
   roi_accepted?: boolean;
   insurance_ack?: boolean;
+  referent_contract_signed_at?: string | null;
+  referent_contract_ip?: string | null;
+  referent_contract_version?: string | null;
 }
 
 export interface MemberProfileCreateInput {
@@ -634,6 +637,37 @@ export interface CreateBlacklistInput {
 export interface BlacklistCheckResult {
   isBlacklisted: boolean;
   message?: string;
+}
+
+// ==========================================
+// INVENTAIRE DU MATÉRIEL & CLÉS CONFIÉS
+// ==========================================
+export const CURRENT_REFERENT_CONTRACT_VERSION = '2026-V1';
+
+export type MemberAssignedKeyRow = Tables<'member_assigned_keys'>;
+
+export interface MemberAssignedKey {
+  id: string;
+  member_id: string;
+  item_name: string;
+  item_code?: string | null;
+  given_at: string;
+  returned_at?: string | null;
+  given_by?: string | null;
+  notes?: string | null;
+  created_at: string;
+  given_by_member?: {
+    first_name: string;
+    last_name: string;
+  } | null;
+}
+
+export interface AssignKeyInput {
+  member_id: string;
+  item_name: string;
+  item_code?: string | null;
+  given_at?: string;
+  notes?: string | null;
 }
 
 // ==========================================

@@ -53,6 +53,9 @@ export interface Database {
           transponder_number: string | null
           roi_accepted: boolean | null
           insurance_ack: boolean | null
+          referent_contract_signed_at?: string | null
+          referent_contract_ip?: string | null
+          referent_contract_version?: string | null
           wallet_balance: number
           tab_balance: number
           consent_email_club_news: boolean
@@ -80,6 +83,9 @@ export interface Database {
           transponder_number?: string | null
           roi_accepted?: boolean | null
           insurance_ack?: boolean | null
+          referent_contract_signed_at?: string | null
+          referent_contract_ip?: string | null
+          referent_contract_version?: string | null
           wallet_balance?: number
           tab_balance?: number
           consent_email_club_news?: boolean
@@ -107,6 +113,9 @@ export interface Database {
           transponder_number?: string | null
           roi_accepted?: boolean | null
           insurance_ack?: boolean | null
+          referent_contract_signed_at?: string | null
+          referent_contract_ip?: string | null
+          referent_contract_version?: string | null
           wallet_balance?: number
           tab_balance?: number
           consent_email_club_news?: boolean
@@ -125,6 +134,57 @@ export interface Database {
             isOneToOne: true
             referencedRelation: "users"
             referencedSchema: "auth"
+          }
+        ]
+      }
+      member_assigned_keys: {
+        Row: {
+          id: string
+          member_id: string
+          item_name: string
+          item_code: string | null
+          given_at: string
+          returned_at: string | null
+          given_by: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          member_id: string
+          item_name: string
+          item_code?: string | null
+          given_at?: string
+          returned_at?: string | null
+          given_by?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          member_id?: string
+          item_name?: string
+          item_code?: string | null
+          given_at?: string
+          returned_at?: string | null
+          given_by?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_assigned_keys_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "sbc_members"
+            referencedSchema: "public"
+          },
+          {
+            foreignKeyName: "member_assigned_keys_given_by_fkey"
+            columns: ["given_by"]
+            isOneToOne: false
+            referencedRelation: "sbc_members"
+            referencedSchema: "public"
           }
         ]
       }

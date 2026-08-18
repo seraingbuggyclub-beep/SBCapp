@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Users, Trophy, Shield, Coffee, Scale, ShieldCheck, Lock } from 'lucide-react';
 import { usePermissions } from '@/modules/admin/hooks/usePermissions';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function AdminNav() {
   const pathname = usePathname();
-  const permissions = usePermissions();
+  const { user, profile } = useAuth();
+  const permissions = usePermissions(user, profile);
 
   const allNavItems = [
     {
@@ -58,14 +60,14 @@ export default function AdminNav() {
   const navItems = allNavItems.filter((item) => item.visible);
 
   return (
-    <div className="flex items-center gap-2 border-b border-[#353535] pb-2 mb-6">
+    <div className="flex items-center gap-2 border-b border-[#353535] pb-2 mb-6 overflow-x-auto scrollbar-none">
       {navItems.map((item) => {
         const Icon = item.icon;
         return (
           <Link
             key={item.href}
             href={item.href}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded font-anybody font-extrabold uppercase text-xs tracking-wider transition-all sport-skew cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded font-anybody font-extrabold uppercase text-xs tracking-wider transition-all sport-skew cursor-pointer shrink-0 ${
               item.active
                 ? 'bg-primary text-black shadow-[3px_3px_0px_#000]'
                 : 'bg-surface text-foreground/70 hover:text-white hover:bg-surface-high border border-[#353535]'

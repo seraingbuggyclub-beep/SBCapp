@@ -12,6 +12,8 @@ import MemberQrCodeCard from '@/modules/members/components/MemberQrCodeCard';
 import PilotAttendanceWidget from '@/modules/attendance/components/PilotAttendanceWidget';
 import MemberPrivacyCenter from '@/modules/gdpr/components/MemberPrivacyCenter';
 import MembershipPaymentModal from '@/modules/payments/components/MembershipPaymentModal';
+import ReferentContractSignatureModal from '@/modules/members/components/ReferentContractSignatureModal';
+import MemberKeysAndContractWidget from '@/modules/members/components/MemberKeysAndContractWidget';
 import {
   User,
   CheckCircle2,
@@ -587,7 +589,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 4. Formulaire complet de gestion du Profil Pilote */}
+      {/* 4. Section Mes Clés, Matériels & Engagements Officiels */}
+      <MemberKeysAndContractWidget
+        member={effectiveProfile}
+        onOpenDocModal={(doc) => setActiveDocModal(doc)}
+      />
+
+      {/* 5. Formulaire complet de gestion du Profil Pilote */}
       <div className="premium-card p-6 md:p-8 rounded-lg border border-[#353535] space-y-6">
         <div className="flex items-center justify-between border-b border-[#353535] pb-4">
           <div className="flex items-center gap-2.5">
@@ -942,6 +950,13 @@ export default function DashboardPage() {
           onPaymentUpdated={refreshAuth}
         />
       )}
+
+      {/* Modale Bloquante de Signature de la Convention Référent */}
+      <ReferentContractSignatureModal
+        member={effectiveProfile}
+        isOpen={Boolean(effectiveProfile?.role === 'referent' && !effectiveProfile?.referent_contract_signed_at)}
+        onSigned={refreshAuth}
+      />
     </div>
   );
 }

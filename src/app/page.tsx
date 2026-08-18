@@ -17,16 +17,16 @@ export default async function LandingPage() {
 
   // Check if current user is logged in and in order of payment to show the lock code
   const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
   let profile = null;
   let clubConfig = null;
   
-  if (session?.user) {
+  if (user) {
     const { data: profileData } = await supabase
       .from('sbc_members')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single();
     
     profile = profileData;

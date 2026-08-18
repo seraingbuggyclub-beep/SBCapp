@@ -26,8 +26,13 @@ import { MemberProfile, UserRole, ModulePermissionsMap, getErrorMessage } from '
 import { PermissionsMatrix } from './PermissionsMatrix';
 import { getMemberQrPayload, getMemberQrTheme } from '@/modules/members/utils/qrcode';
 import { blacklistAndRevokeMember } from '../blacklist-actions';
+import BlacklistReasonSelector, {
+  getSavedRejectionMessage,
+  saveRejectionMessage,
+} from './BlacklistReasonSelector';
 import QrCodeModal from '@/modules/members/components/QrCodeModal';
 import ReferentPermissionsModal from './ReferentPermissionsModal';
+import MemberKeysManager from './MemberKeysManager';
 
 interface MembersManagementTabProps {
   members: MemberProfile[];
@@ -121,9 +126,7 @@ export default function MembersManagementTab({
   const handleOpenBlacklistModal = (member: MemberProfile) => {
     setBlacklistModalMember(member);
     setInternalReason('');
-    setRejectionMessage(
-      "Votre demande d'inscription n'a pas été retenue par l'Organe d'Administration du Seraing Buggy Club (ASBL), conformément aux statuts du club."
-    );
+    setRejectionMessage(getSavedRejectionMessage());
     setActionError('');
     setActionSuccess('');
   };
@@ -132,7 +135,7 @@ export default function MembersManagementTab({
     e.preventDefault();
     if (!blacklistModalMember) return;
     if (!internalReason.trim()) {
-      setActionError('Le motif interne privé est obligatoire.');
+      setActionError('Veuillez sélectionner ou préciser au moins un motif interne de blocage.');
       return;
     }
 
@@ -141,6 +144,7 @@ export default function MembersManagementTab({
     setActionSuccess('');
 
     try {
+      saveRejectionMessage(rejectionMessage);
       const { success, error } = await blacklistAndRevokeMember(
         blacklistModalMember.id,
         internalReason,
@@ -431,10 +435,10 @@ export default function MembersManagementTab({
         </table>
       </div>
 
-      {/* Modale Détails Pilote avec QR Code */}
+      {/* Modale Détails Pilote avec QR Code & Gestion des Clés */}
       {selectedMember && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md premium-card p-6 md:p-7 rounded-2xl border border-[#353535] relative shadow-[0_0_50px_rgba(0,0,0,0.8)] max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-2xl premium-card p-6 md:p-7 rounded-2xl border border-[#353535] relative shadow-[0_0_50px_rgba(0,0,0,0.8)] max-h-[90vh] overflow-y-auto space-y-6">
             <button
               onClick={() => setSelectedMember(null)}
               className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-surface border border-transparent hover:border-[#353535] text-foreground/50 hover:text-white transition-all cursor-pointer"
@@ -443,12 +447,12 @@ export default function MembersManagementTab({
               <X className="w-4 h-4" />
             </button>
 
-            <div className="mb-4 pb-3 border-b border-[#353535]/50">
+            <div className="pb-3 border-b border-[#353535]/50">
               <h3 className="font-anybody font-black text-xl uppercase tracking-tight sport-skew text-white">
-                Fiche Pilote
+                Fiche Pilote & Inventaire
               </h3>
               <p className="text-[10px] text-primary font-mono mt-0.5 uppercase tracking-wider">
-                Seraing Buggy Club
+                Seraing Buggy Club • Dossier Officiel
               </p>
             </div>
 
@@ -458,7 +462,7 @@ export default function MembersManagementTab({
               const payload = getMemberQrPayload(selectedMember.id);
 
               return (
-                <div className={`p-4 rounded-xl border bg-black/60 mb-4 flex items-center justify-between gap-4 ${theme.containerBorder} ${theme.glowClass}`}>
+                <div className={`p-4 rounded-xl border bg-black/60 flex items-center justify-between gap-4 ${theme.containerBorder} ${theme.glowClass}`}>
                   <div className="p-2 rounded-lg bg-black border border-[#353535] shrink-0">
                     <QRCodeSVG
                       value={payload}
@@ -495,37 +499,39 @@ export default function MembersManagementTab({
               );
             })()}
 
-            <div className="space-y-4 font-mono text-xs text-foreground/80">
-              <div>
-                <span className="text-[9px] text-foreground/45 uppercase tracking-wider block mb-0.5">Identité</span>
-                <div className="font-bold text-sm text-white font-sans">
-                  {selectedMember.first_name} {selectedMember.last_name}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs text-foreground/80">
+              <div className="space-y-3 p-4 rounded-xl bg-surface/30 border border-[#353535]">
+                <div>
+                  <span className="text-[9px] text-foreground/45 uppercase tracking-wider block mb-0.5">Identité</span>
+                  <div className="font-bold text-sm text-white font-sans">
+                    {selectedMember.first_name} {selectedMember.last_name}
+                  </div>
+                  <div className="text-[10px] text-foreground/40">{selectedMember.email}</div>
                 </div>
-                <div className="text-[10px] text-foreground/40">{selectedMember.email}</div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-[#353535]/40">
+                  <div>
+                    <span className="text-[9px] text-foreground/45 uppercase tracking-wider block mb-0.5">Rôle</span>
+                    <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${getRoleBadgeClass(selectedMember.role)}`}>
+                      {getRoleLabel(selectedMember.role)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-foreground/45 uppercase tracking-wider block mb-0.5">Cotisation</span>
+                    <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
+                      selectedMember.payment_status === 'paid'
+                        ? 'bg-success/10 text-success border-success/20'
+                        : selectedMember.payment_status === 'expired'
+                        ? 'bg-secondary/10 text-secondary border-secondary/20'
+                        : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+                    }`}>
+                      {selectedMember.payment_status === 'paid' ? 'En ordre' : selectedMember.payment_status === 'expired' ? 'Expiré' : 'En attente'}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div>
-                  <span className="text-[9px] text-foreground/45 uppercase tracking-wider block mb-0.5">Rôle</span>
-                  <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${getRoleBadgeClass(selectedMember.role)}`}>
-                    {getRoleLabel(selectedMember.role)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[9px] text-foreground/45 uppercase tracking-wider block mb-0.5">Cotisation</span>
-                  <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
-                    selectedMember.payment_status === 'paid'
-                      ? 'bg-success/10 text-success border-success/20'
-                      : selectedMember.payment_status === 'expired'
-                      ? 'bg-secondary/10 text-secondary border-secondary/20'
-                      : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
-                  }`}>
-                    {selectedMember.payment_status === 'paid' ? 'En ordre' : selectedMember.payment_status === 'expired' ? 'Expiré' : 'En attente'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-2 pt-2 border-t border-[#353535]/50">
+              <div className="space-y-2 p-4 rounded-xl bg-surface/30 border border-[#353535]">
                 <div className="flex items-center gap-2 text-foreground/70">
                   <Hash className="w-3.5 h-3.5 text-primary shrink-0" />
                   <span>Licence FBA : <strong className="text-white">{selectedMember.license_number || 'Non renseigné'}</strong></span>
@@ -536,7 +542,7 @@ export default function MembersManagementTab({
                 </div>
                 <div className="flex items-center gap-2 text-foreground/70">
                   <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
-                  <span>Adresse : <strong className="text-white">{selectedMember.street_number ? `${selectedMember.street_number}, ${selectedMember.zip_code} ${selectedMember.city}` : 'Non renseignée'}</strong></span>
+                  <span className="truncate">Adresse : <strong className="text-white">{selectedMember.street_number ? `${selectedMember.street_number}, ${selectedMember.zip_code} ${selectedMember.city}` : 'Non renseignée'}</strong></span>
                 </div>
                 <div className="flex items-center gap-2 text-foreground/70">
                   <Calendar className="w-3.5 h-3.5 text-primary shrink-0" />
@@ -546,20 +552,30 @@ export default function MembersManagementTab({
                   <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
                   <span>Transpondeur : <strong className="text-white">{selectedMember.transponder_number || 'Aucun'}</strong></span>
                 </div>
-
-                <div className="pt-2 border-t border-[#353535]/50">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleOpenBlacklistModal(selectedMember);
-                    }}
-                    className="w-full py-2.5 rounded bg-secondary/15 hover:bg-secondary/25 border border-secondary/40 text-secondary text-xs font-mono font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors"
-                  >
-                    <Ban className="w-4 h-4" />
-                    <span>Révoquer & Ajouter à la liste noire</span>
-                  </button>
-                </div>
               </div>
+            </div>
+
+            {/* Section Matériel & Clés confiés & Convention Référent */}
+            <div className="pt-2 border-t border-[#353535]/50">
+              <MemberKeysManager
+                member={selectedMember}
+                canEdit={canEditMembers}
+                onRefreshParent={onRefreshMembers}
+              />
+            </div>
+
+            {/* Actions disciplinaires */}
+            <div className="pt-2 border-t border-[#353535]/50">
+              <button
+                type="button"
+                onClick={() => {
+                  handleOpenBlacklistModal(selectedMember);
+                }}
+                className="w-full py-2.5 rounded bg-secondary/15 hover:bg-secondary/25 border border-secondary/40 text-secondary text-xs font-mono font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors"
+              >
+                <Ban className="w-4 h-4" />
+                <span>Révoquer & Ajouter à la liste noire</span>
+              </button>
             </div>
           </div>
         </div>
@@ -594,31 +610,15 @@ export default function MembersManagementTab({
             </div>
 
             <form onSubmit={handleConfirmBlacklist} className="space-y-3 font-mono text-xs">
-              <div>
-                <label className="block text-[10px] uppercase tracking-wider text-secondary font-bold mb-1">
-                  Motif interne confidentiel (CA uniquement) *
-                </label>
-                <textarea
-                  required
-                  rows={2}
-                  value={internalReason}
-                  onChange={(e) => setInternalReason(e.target.value)}
-                  placeholder="Ex: Bagarre en tribune lors de la course, non-respect répété du ROI, comportement dangereux..."
-                  className="w-full bg-background border border-secondary/40 rounded px-3 py-2 text-white focus:outline-none focus:border-secondary text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] uppercase tracking-wider text-foreground/50 mb-1">
-                  Message officiel de refus affiché à la personne
-                </label>
-                <textarea
-                  rows={2}
-                  value={rejectionMessage}
-                  onChange={(e) => setRejectionMessage(e.target.value)}
-                  className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-foreground/80 focus:outline-none focus:border-secondary text-xs"
-                />
-              </div>
+              <BlacklistReasonSelector
+                key={blacklistModalMember.id}
+                initialReason={internalReason}
+                initialRejectionMessage={rejectionMessage}
+                onChange={({ internalReason: newReason, rejectionMessage: newMsg }) => {
+                  setInternalReason((prev) => (prev === newReason ? prev : newReason));
+                  setRejectionMessage((prev) => (prev === newMsg ? prev : newMsg));
+                }}
+              />
 
               <div className="pt-3 border-t border-[#353535] flex items-center justify-end gap-2">
                 <button

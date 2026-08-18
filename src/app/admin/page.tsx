@@ -245,6 +245,9 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 py-4">
+      {/* Navigation Modules Admin */}
+      <AdminNav />
+
       {/* Header Admin */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#353535] pb-4">
         <div>
@@ -258,8 +261,6 @@ export default function AdminPage() {
             Gestion du club, cotisations, permissions et sécurité
           </p>
         </div>
-
-        <AdminNav />
       </div>
 
       {/* Bannière de notification globale */}

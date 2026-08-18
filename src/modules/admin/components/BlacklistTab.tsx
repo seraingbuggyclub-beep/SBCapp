@@ -24,6 +24,10 @@ import {
   updateBlacklistEntry,
   removeFromBlacklist,
 } from '../blacklist-actions';
+import BlacklistReasonSelector, {
+  getSavedRejectionMessage,
+  saveRejectionMessage,
+} from './BlacklistReasonSelector';
 import { BlacklistEntry, CreateBlacklistInput, getErrorMessage } from '@/types/models';
 
 export default function BlacklistTab() {
@@ -91,8 +95,7 @@ export default function BlacklistTab() {
       last_name: '',
       license_number: '',
       internal_reason: '',
-      rejection_message:
-        "Votre demande d'inscription n'a pas été retenue par l'Organe d'Administration du Seraing Buggy Club (ASBL), conformément aux statuts du club.",
+      rejection_message: getSavedRejectionMessage(),
     });
     setModalOpen(true);
   };
@@ -105,7 +108,7 @@ export default function BlacklistTab() {
       last_name: entry.last_name || '',
       license_number: entry.license_number || '',
       internal_reason: entry.internal_reason,
-      rejection_message: entry.rejection_message,
+      rejection_message: entry.rejection_message || getSavedRejectionMessage(),
     });
     setModalOpen(true);
   };
@@ -113,7 +116,7 @@ export default function BlacklistTab() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.internal_reason.trim()) {
-      setErrorMsg('Le motif interne privé est obligatoire.');
+      setErrorMsg('Veuillez sélectionner ou préciser au moins un motif interne de blocage.');
       return;
     }
 
@@ -122,6 +125,7 @@ export default function BlacklistTab() {
     setSuccessMsg('');
 
     try {
+      saveRejectionMessage(formData.rejection_message);
       if (editingEntry) {
         const { success, error } = await updateBlacklistEntry(editingEntry.id, formData);
         if (!success || error) throw new Error(error || 'Erreur lors de la mise à jour.');
@@ -411,31 +415,26 @@ export default function BlacklistTab() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[10px] uppercase tracking-wider text-secondary font-bold mb-1">
-                  Motif interne privé (Obligatoire - CA uniquement) *
-                </label>
-                <textarea
-                  required
-                  rows={2}
-                  value={formData.internal_reason}
-                  onChange={(e) => setFormData({ ...formData, internal_reason: e.target.value })}
-                  placeholder="Ex: Bagarre en tribune, non-respect récurrent du ROI, impayés buvette..."
-                  className="w-full bg-background border border-secondary/40 rounded px-3 py-2 text-white focus:outline-none focus:border-secondary text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] uppercase tracking-wider text-foreground/50 mb-1">
-                  Message de refus affiché à la personne
-                </label>
-                <textarea
-                  rows={2}
-                  value={formData.rejection_message}
-                  onChange={(e) => setFormData({ ...formData, rejection_message: e.target.value })}
-                  className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-foreground/80 focus:outline-none focus:border-secondary text-xs"
-                />
-              </div>
+              <BlacklistReasonSelector
+                key={editingEntry ? editingEntry.id : 'new'}
+                initialReason={formData.internal_reason}
+                initialRejectionMessage={formData.rejection_message}
+                onChange={({ internalReason, rejectionMessage }) => {
+                  setFormData((prev) => {
+                    if (
+                      prev.internal_reason === internalReason &&
+                      prev.rejection_message === rejectionMessage
+                    ) {
+                      return prev;
+                    }
+                    return {
+                      ...prev,
+                      internal_reason: internalReason,
+                      rejection_message: rejectionMessage,
+                    };
+                  });
+                }}
+              />
 
               <div className="pt-3 border-t border-[#353535] flex items-center justify-end gap-2">
                 <button

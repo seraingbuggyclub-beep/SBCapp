@@ -8,6 +8,7 @@ import {
   BlacklistCheckResult,
   getErrorMessage,
 } from '@/types/models';
+import { isSuperAdmin } from './permissions';
 
 const DEFAULT_REJECTION_MESSAGE =
   "Votre demande d'inscription n'a pas été retenue par l'Organe d'Administration du Seraing Buggy Club (ASBL), conformément aux statuts du club.";
@@ -169,6 +170,17 @@ export async function addToBlacklist(
       return { success: false, error: 'Non authentifié.' };
     }
 
+    const { data: caller } = await supabase
+      .from('sbc_members')
+      .select('role, email')
+      .eq('id', user.id)
+      .single();
+
+    const isSuper = isSuperAdmin(caller?.email || user.email);
+    if (!isSuper && caller?.role !== 'admin') {
+      return { success: false, error: 'Action réservée aux administrateurs.' };
+    }
+
     if (!input.internal_reason?.trim()) {
       return { success: false, error: 'Le motif interne privé est obligatoire.' };
     }
@@ -205,6 +217,24 @@ export async function updateBlacklistEntry(
 ): Promise<{ success: boolean; error: string | null }> {
   try {
     const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: 'Non authentifié.' };
+    }
+
+    const { data: caller } = await supabase
+      .from('sbc_members')
+      .select('role, email')
+      .eq('id', user.id)
+      .single();
+
+    const isSuper = isSuperAdmin(caller?.email || user.email);
+    if (!isSuper && caller?.role !== 'admin') {
+      return { success: false, error: 'Action réservée aux administrateurs.' };
+    }
 
     const updatePayload: Record<string, string | null> = {};
     if (input.email !== undefined) updatePayload.email = input.email ? input.email.trim().toLowerCase() : null;
@@ -236,6 +266,24 @@ export async function removeFromBlacklist(
 ): Promise<{ success: boolean; error: string | null }> {
   try {
     const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: 'Non authentifié.' };
+    }
+
+    const { data: caller } = await supabase
+      .from('sbc_members')
+      .select('role, email')
+      .eq('id', user.id)
+      .single();
+
+    const isSuper = isSuperAdmin(caller?.email || user.email);
+    if (!isSuper && caller?.role !== 'admin') {
+      return { success: false, error: 'Action réservée aux administrateurs.' };
+    }
 
     const { error } = await supabase
       .from('blacklist')
@@ -267,6 +315,17 @@ export async function blacklistAndRevokeMember(
 
     if (!user) {
       return { success: false, error: 'Non authentifié.' };
+    }
+
+    const { data: caller } = await supabase
+      .from('sbc_members')
+      .select('role, email')
+      .eq('id', user.id)
+      .single();
+
+    const isSuper = isSuperAdmin(caller?.email || user.email);
+    if (!isSuper && caller?.role !== 'admin') {
+      return { success: false, error: 'Action réservée aux administrateurs.' };
     }
 
     if (!internalReason?.trim()) {

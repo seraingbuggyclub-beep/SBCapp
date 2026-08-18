@@ -767,3 +767,6 @@ export function getErrorMessage(err: unknown): string {
   }
   return 'Une erreur inattendue est survenue.';
 }
+
+export * from './actions';
+

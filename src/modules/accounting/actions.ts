@@ -8,6 +8,7 @@ import {
   AccountingFilters,
   CreateTransactionInput,
 } from '@/types/models';
+import { isSuperAdmin } from '@/modules/admin/permissions';
 
 /**
  * Récupère le grand livre des écritures comptables avec filtres
@@ -199,11 +200,12 @@ export async function createAccountingTransaction(
 
     const { data: member } = await supabase
       .from('sbc_members')
-      .select('role')
+      .select('role, email')
       .eq('id', user.id)
       .single();
 
-    if (member?.role !== 'admin') {
+    const isSuper = isSuperAdmin(member?.email || user.email);
+    if (!isSuper && member?.role !== 'admin') {
       return { success: false, error: 'Action réservée aux administrateurs.' };
     }
 
@@ -248,6 +250,17 @@ export async function updateAccountingTransaction(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'Non authentifié' };
 
+    const { data: member } = await supabase
+      .from('sbc_members')
+      .select('role, email')
+      .eq('id', user.id)
+      .single();
+
+    const isSuper = isSuperAdmin(member?.email || user.email);
+    if (!isSuper && member?.role !== 'admin') {
+      return { success: false, error: 'Action réservée aux administrateurs.' };
+    }
+
     const payload: {
       date?: string;
       type?: string;
@@ -291,6 +304,17 @@ export async function deleteAccountingTransaction(
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'Non authentifié' };
+
+    const { data: member } = await supabase
+      .from('sbc_members')
+      .select('role, email')
+      .eq('id', user.id)
+      .single();
+
+    const isSuper = isSuperAdmin(member?.email || user.email);
+    if (!isSuper && member?.role !== 'admin') {
+      return { success: false, error: 'Action réservée aux administrateurs.' };
+    }
 
     const { error } = await supabase
       .from('accounting_transactions')

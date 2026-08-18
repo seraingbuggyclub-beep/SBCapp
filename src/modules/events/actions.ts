@@ -14,6 +14,7 @@ import {
   SelectedMealItem,
   Json
 } from '@/types/models';
+import { isSuperAdmin } from '@/modules/admin/permissions';
 
 export type { RaceCategoryItem, MealOptionItem, EventType, EventFormData, SelectedCategoryItem, SelectedMealItem };
 
@@ -66,6 +67,19 @@ export async function getAllEventsAdmin(): Promise<{ data: (ClubEvent & { regist
 // 3. Créer un nouvel événement (Admin)
 export async function createEventAdmin(formData: EventFormData): Promise<{ data: ClubEvent | null; error: string | null }> {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: 'Non authentifié' };
+
+  const { data: member } = await supabase
+    .from('sbc_members')
+    .select('role, email')
+    .eq('id', user.id)
+    .single();
+
+  const isSuper = isSuperAdmin(member?.email || user.email);
+  if (!isSuper && member?.role !== 'admin') {
+    return { data: null, error: 'Action réservée aux administrateurs.' };
+  }
 
   const payload: ClubEventInsert = {
     title: formData.title,
@@ -104,6 +118,19 @@ export async function createEventAdmin(formData: EventFormData): Promise<{ data:
 // 4. Mettre à jour un événement existant (Admin)
 export async function updateEventAdmin(eventId: string, formData: Partial<EventFormData>): Promise<{ data: ClubEvent | null; error: string | null }> {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: 'Non authentifié' };
+
+  const { data: member } = await supabase
+    .from('sbc_members')
+    .select('role, email')
+    .eq('id', user.id)
+    .single();
+
+  const isSuper = isSuperAdmin(member?.email || user.email);
+  if (!isSuper && member?.role !== 'admin') {
+    return { data: null, error: 'Action réservée aux administrateurs.' };
+  }
 
   const updatePayload: ClubEventUpdate = {
     ...(formData.title ? { title: formData.title } : {}),
@@ -143,6 +170,19 @@ export async function updateEventAdmin(eventId: string, formData: Partial<EventF
 // 5. Supprimer un événement (Admin)
 export async function deleteEventAdmin(eventId: string): Promise<{ success: boolean; error: string | null }> {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: 'Non authentifié' };
+
+  const { data: member } = await supabase
+    .from('sbc_members')
+    .select('role, email')
+    .eq('id', user.id)
+    .single();
+
+  const isSuper = isSuperAdmin(member?.email || user.email);
+  if (!isSuper && member?.role !== 'admin') {
+    return { success: false, error: 'Action réservée aux administrateurs.' };
+  }
 
   const { error } = await supabase
     .from('sbc_events')

@@ -4,8 +4,6 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSimulation } from '@/modules/admin/contexts/SimulationContext';
 import { isSuperAdmin } from '@/modules/admin/permissions';
-import { updateMemberProfile } from '@/modules/members/actions';
-import { syncMyFbaLicense } from '@/modules/members/fba-sync';
 import { getMemberRegistrations, getActiveEvents } from '@/modules/events/actions';
 import { getMemberClubLockCode } from '@/modules/payments/actions';
 import AuthForm from '@/modules/members/components/AuthForm';
@@ -16,36 +14,28 @@ import MembershipPaymentModal from '@/modules/payments/components/MembershipPaym
 import ReferentContractSignatureModal from '@/modules/members/components/ReferentContractSignatureModal';
 import MemberKeysAndContractWidget from '@/modules/members/components/MemberKeysAndContractWidget';
 import FeedbackIdeasWidget from '@/modules/feedback/components/widgets/FeedbackIdeasWidget';
+import ProfileEditForm from '@/modules/members/components/ProfileEditForm';
+import OfficialDocumentsModal from '@/modules/members/components/OfficialDocumentsModal';
 import {
-  User,
-  CheckCircle2,
   AlertTriangle,
   Calendar,
-  Clock,
   MapPin,
   Trophy,
   ShieldCheck,
-  Hash,
-  Phone,
-  Save,
-  Radio,
   FileText,
   Shield,
   ArrowRight,
   Lock,
   Unlock,
-  KeyRound,
   Sliders,
   Sparkles,
   BookOpen,
   Award,
-  X,
-  ExternalLink,
   ChevronRight,
-  RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
-import { ClubEvent, getErrorMessage, MemberProfileUpdateInput } from '@/types/models';
+import { ClubEvent, getErrorMessage } from '@/types/models';
+import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 
 interface MemberRegistrationItem {
   id: string;
@@ -70,28 +60,9 @@ export default function DashboardPage() {
   const hasAgreements = Boolean(effectiveProfile?.roi_accepted && effectiveProfile?.insurance_ack);
 
   const [registrations, setRegistrations] = useState<MemberRegistrationItem[]>([]);
-  const [upcomingEvents, setUpcomingEvents] = useState<ClubEvent[]>([]);
+  const [, setUpcomingEvents] = useState<ClubEvent[]>([]);
   const [lockCode, setLockCode] = useState<string | null>(null);
-  const [dataLoading, setDataLoading] = useState(false);
-
-  // Form State pour l'édition complète du profil
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [licenseNumber, setLicenseNumber] = useState('');
-  const [birthDate, setBirthDate] = useState('');
-  const [streetNumber, setStreetNumber] = useState('');
-  const [zipCode, setZipCode] = useState('');
-  const [city, setCity] = useState('');
-  const [transponderNumber, setTransponderNumber] = useState('');
-  const [roiAccepted, setRoiAccepted] = useState(false);
-  const [insuranceAck, setInsuranceAck] = useState(false);
-
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [profileMsg, setProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  const [syncingFba, setSyncingFba] = useState(false);
-  const [fbaMsg, setFbaMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [, setDataLoading] = useState(false);
 
   // Modale de lecture des documents officiels (ROI / Charte)
   const [activeDocModal, setActiveDocModal] = useState<'roi' | 'charte' | null>(null);
@@ -105,23 +76,6 @@ export default function DashboardPage() {
       isMountedRef.current = false;
     };
   }, []);
-
-  // Synchronisation des champs lors du chargement du profil effectif
-  useEffect(() => {
-    if (effectiveProfile) {
-      setFirstName(effectiveProfile.first_name || '');
-      setLastName(effectiveProfile.last_name || '');
-      setPhone(effectiveProfile.phone || '');
-      setLicenseNumber(effectiveProfile.license_number || '');
-      setBirthDate(effectiveProfile.birth_date || '');
-      setStreetNumber(effectiveProfile.street_number || '');
-      setZipCode(effectiveProfile.zip_code || '');
-      setCity(effectiveProfile.city || '');
-      setTransponderNumber(effectiveProfile.transponder_number || '');
-      setRoiAccepted(Boolean(effectiveProfile.roi_accepted));
-      setInsuranceAck(Boolean(effectiveProfile.insurance_ack));
-    }
-  }, [effectiveProfile]);
 
   const loadMemberData = useCallback(async (userId: string) => {
     setDataLoading(true);
@@ -166,90 +120,6 @@ export default function DashboardPage() {
     }
   }, [user?.id, simulatedProfile, isPaid, loadMemberData]);
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    setSavingProfile(true);
-    setProfileMsg(null);
-
-    try {
-      if (!firstName.trim() || !lastName.trim()) {
-        throw new Error('Le prénom et le nom sont requis.');
-      }
-      if (!phone.trim()) {
-        throw new Error('Le numéro de téléphone est obligatoire.');
-      }
-      if (!roiAccepted) {
-        throw new Error("Vous devez accepter le Règlement d'Ordre Intérieur (ROI).");
-      }
-
-      const payload: MemberProfileUpdateInput = {
-        id: user.id,
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        phone: phone.trim(),
-        license_number: licenseNumber.trim() || null,
-        birth_date: birthDate || null,
-        street_number: streetNumber.trim() || null,
-        zip_code: zipCode.trim() || null,
-        city: city.trim() || null,
-        transponder_number: transponderNumber.trim() || null,
-        roi_accepted: roiAccepted,
-        insurance_ack: insuranceAck,
-      };
-
-      const { error } = await updateMemberProfile(payload);
-      if (error) throw new Error(error);
-
-      await refreshAuth();
-      if (isMountedRef.current) {
-        setProfileMsg({ type: 'success', text: 'Profil et paramètres piste enregistrés avec succès !' });
-        setTimeout(() => {
-          if (isMountedRef.current) setProfileMsg(null);
-        }, 4000);
-      }
-    } catch (err: unknown) {
-      if (isMountedRef.current) {
-        setProfileMsg({ type: 'error', text: getErrorMessage(err) });
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setSavingProfile(false);
-      }
-    }
-  };
-
-  const handleSyncFba = async () => {
-    const activeUserId = user?.id || effectiveProfile?.id;
-    if (!activeUserId) return;
-    setSyncingFba(true);
-    setFbaMsg(null);
-
-    try {
-      const res = await syncMyFbaLicense(activeUserId);
-      if (!res.success) {
-        setFbaMsg({ type: 'error', text: res.error || 'Affiliation non trouvée sur fba-rc.be' });
-      } else {
-        if (res.licenseNumber) {
-          setLicenseNumber(res.licenseNumber);
-        }
-        await refreshAuth();
-        setFbaMsg({ type: 'success', text: res.message || 'Licence FBA synchronisée avec succès !' });
-        setTimeout(() => {
-          if (isMountedRef.current) setFbaMsg(null);
-        }, 5000);
-      }
-    } catch (err: unknown) {
-      if (isMountedRef.current) {
-        setFbaMsg({ type: 'error', text: getErrorMessage(err) });
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setSyncingFba(false);
-      }
-    }
-  };
-
   if (authLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3 font-mono text-xs text-foreground/50">
@@ -288,7 +158,7 @@ export default function DashboardPage() {
                 Accès Piste & Courses Verrouillé
               </strong>
               <span className="text-foreground/90 text-xs">
-                Vous devez obligatoirement valider le <strong>Règlement d'Ordre Intérieur (ROI)</strong> et l'<strong>Assurance FBA</strong> ci-dessous pour débloquer votre accès au terrain et aux inscriptions.
+                Vous devez obligatoirement valider le <strong>Règlement d&apos;Ordre Intérieur (ROI)</strong> et l&apos;<strong>Assurance FBA</strong> ci-dessous pour débloquer votre accès au terrain et aux inscriptions.
               </span>
             </div>
           </div>
@@ -362,7 +232,7 @@ export default function DashboardPage() {
                 className="premium-btn text-xs px-5 py-2.5 flex items-center gap-2 shadow-[0_0_20px_rgba(255,110,0,0.25)] cursor-pointer"
               >
                 <Trophy className="w-4 h-4" />
-                <span className="transform skew-x-8">S'inscrire à une course</span>
+                <span className="transform skew-x-8">S&apos;inscrire à une course</span>
               </Link>
 
               <Link
@@ -394,7 +264,7 @@ export default function DashboardPage() {
 
       {/* 2. Grille des Widgets Clés (Cadenas, Assurance FBA, Setups Teaser) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Widget Cadenas d'accès (Compact & Direct) */}
+        {/* Widget Cadenas d'accès */}
         <div className="premium-card p-5 rounded-lg border border-[#353535] flex flex-col justify-between space-y-3 relative overflow-hidden">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -427,7 +297,7 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-2">
                 <p className="text-xs font-mono text-foreground/60 leading-relaxed">
-                  Le code d'accès au portail et aux stands est réservé aux membres en ordre de cotisation.
+                  Le code d&apos;accès au portail et aux stands est réservé aux membres en ordre de cotisation.
                 </p>
                 <button
                   onClick={() => setPaymentModalOpen(true)}
@@ -541,7 +411,7 @@ export default function DashboardPage() {
                       {reg.sbc_events?.title || 'Événement Club'}
                     </span>
                     <span className="text-[10px] font-mono text-success font-bold px-2 py-0.5 rounded bg-success/10 border border-success/20">
-                      {reg.total_paid} € • Enregistré
+                      {formatCurrency(reg.total_paid)} • Enregistré
                     </span>
                   </div>
                   <div className="text-[11px] font-mono text-foreground/60">
@@ -550,7 +420,7 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-4 text-[10px] font-mono text-foreground/40 pt-1">
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3 h-3 text-primary" />
-                      {reg.sbc_events?.event_date}
+                      {formatDate(reg.sbc_events?.event_date)}
                     </span>
                     <span className="flex items-center gap-1">
                       <MapPin className="w-3 h-3 text-primary" />
@@ -587,7 +457,7 @@ export default function DashboardPage() {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-anybody font-black text-xs uppercase sport-skew text-white group-hover:text-primary transition-colors">
-                    Règlement d'Ordre Intérieur (ROI)
+                    Règlement d&apos;Ordre Intérieur (ROI)
                   </span>
                   <FileText className="w-4 h-4 text-primary shrink-0" />
                 </div>
@@ -632,404 +502,19 @@ export default function DashboardPage() {
       {/* 5. Boîte à Idées & Signalement d'Anomalies */}
       <FeedbackIdeasWidget member={effectiveProfile} />
 
-      {/* 6. Formulaire complet de gestion du Profil Pilote */}
-      <div className="premium-card p-6 md:p-8 rounded-lg border border-[#353535] space-y-6">
-        <div className="flex items-center justify-between border-b border-[#353535] pb-4">
-          <div className="flex items-center gap-2.5">
-            <User className="w-5 h-5 text-primary" />
-            <h2 className="font-anybody font-black text-xl uppercase tracking-tight sport-skew text-white">
-              Mon Profil & Paramètres Piste
-            </h2>
-          </div>
-          <span className="text-[10px] font-mono text-foreground/45 uppercase tracking-wider hidden sm:inline">
-            Fiche Officielle Pilote
-          </span>
-        </div>
+      {/* 6. Formulaire complet de gestion du Profil Pilote (Composant Découplé) */}
+      <ProfileEditForm member={effectiveProfile} onProfileUpdated={refreshAuth} />
 
-        {profileMsg && (
-          <div
-            className={`p-3.5 rounded font-mono text-xs flex items-center gap-2 animate-fade-in ${
-              profileMsg.type === 'success'
-                ? 'bg-success/15 border border-success/30 text-success'
-                : 'bg-secondary/15 border border-secondary/30 text-secondary'
-            }`}
-          >
-            {profileMsg.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-            ) : (
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-            )}
-            <span>{profileMsg.text}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSaveProfile} className="space-y-6">
-          {/* Section 1 : Identité & Contact */}
-          <div>
-            <h3 className="text-xs font-mono uppercase tracking-wider text-primary font-bold mb-3 flex items-center gap-1.5">
-              <span>1. Identité & Contact</span>
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/60 mb-1">
-                  Prénom *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/60 mb-1">
-                  Nom *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[10px] font-mono uppercase tracking-wider text-foreground/60">
-                    Adresse Email
-                  </label>
-                  <span className="text-[9px] font-mono text-primary px-1 py-0.2 rounded bg-primary/10 border border-primary/20">
-                    Lié au compte
-                  </span>
-                </div>
-                <input
-                  type="email"
-                  disabled
-                  value={user?.email || effectiveProfile?.email || ''}
-                  className="w-full bg-background/50 border border-[#353535] rounded px-3 py-2 text-xs font-mono text-foreground/60 cursor-not-allowed select-none opacity-80"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/60 mb-1">
-                  Téléphone (GSM) *
-                </label>
-                <div className="relative">
-                  <Phone className="w-3.5 h-3.5 text-foreground/40 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="tel"
-                    required
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+32 400 00 00 00"
-                    className="w-full bg-background border border-[#353535] rounded pl-8 pr-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/60 mb-1">
-                  Date de Naissance
-                </label>
-                <input
-                  type="date"
-                  value={birthDate}
-                  onChange={(e) => setBirthDate(e.target.value)}
-                  className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2 : Adresse postale */}
-          <div className="pt-2 border-t border-[#353535]/60">
-            <h3 className="text-xs font-mono uppercase tracking-wider text-primary font-bold mb-3 flex items-center gap-1.5">
-              <span>2. Adresse Résidentielle</span>
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="sm:col-span-1">
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/60 mb-1">
-                  Rue et Numéro
-                </label>
-                <input
-                  type="text"
-                  value={streetNumber}
-                  onChange={(e) => setStreetNumber(e.target.value)}
-                  placeholder="Ex: Rue de la Piste, 42"
-                  className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/60 mb-1">
-                  Code Postal
-                </label>
-                <input
-                  type="text"
-                  value={zipCode}
-                  onChange={(e) => setZipCode(e.target.value)}
-                  placeholder="Ex: 4100"
-                  className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/60 mb-1">
-                  Ville
-                </label>
-                <input
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="Ex: Seraing"
-                  className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section 3 : Paramètres Piste & Licences */}
-          <div className="pt-2 border-t border-[#353535]/60 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <h3 className="text-xs font-mono uppercase tracking-wider text-primary font-bold flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-primary" />
-                <span>3. Paramètres Course & Licences FBA</span>
-              </h3>
-              <button
-                type="button"
-                onClick={handleSyncFba}
-                disabled={syncingFba}
-                className="px-3 py-1.5 rounded bg-primary/10 hover:bg-primary/20 border border-primary/40 hover:border-primary text-primary font-mono text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 self-start sm:self-auto disabled:opacity-50"
-                title="Interroger le registre officiel fba-rc.be pour mettre à jour votre numéro d'affiliation"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${syncingFba ? 'animate-spin' : ''}`} />
-                <span>{syncingFba ? 'Synchronisation FBA...' : '🔄 Synchroniser avec la FBA'}</span>
-              </button>
-            </div>
-
-            {/* Notification de synchronisation FBA */}
-            {fbaMsg && (
-              <div
-                className={`p-3 rounded font-mono text-xs flex items-center gap-2 animate-fade-in ${
-                  fbaMsg.type === 'success'
-                    ? 'bg-success/15 border border-success/30 text-success'
-                    : 'bg-secondary/15 border border-secondary/30 text-secondary'
-                }`}
-              >
-                {fbaMsg.type === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                ) : (
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                )}
-                <span>{fbaMsg.text}</span>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[10px] font-mono uppercase tracking-wider text-foreground/60">
-                    Numéro de Licence FBA
-                  </label>
-                  {effectiveProfile?.fba_synced_at ? (
-                    <span className="text-[9px] font-mono text-success flex items-center gap-1">
-                      <CheckCircle2 className="w-2.5 h-2.5" /> Synchro FBA le {new Date(effectiveProfile.fba_synced_at).toLocaleDateString('fr-BE')}
-                    </span>
-                  ) : effectiveProfile?.license_number ? (
-                    <span className="text-[9px] font-mono text-foreground/50">
-                      Édition manuelle
-                    </span>
-                  ) : (
-                    <span className="text-[9px] font-mono text-yellow-400">
-                      Non synchronisé
-                    </span>
-                  )}
-                </div>
-                <div className="relative">
-                  <Hash className="w-3.5 h-3.5 text-foreground/40 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={licenseNumber}
-                    onChange={(e) => setLicenseNumber(e.target.value)}
-                    placeholder="Ex: 143-52"
-                    className="w-full bg-background border border-[#353535] rounded pl-8 pr-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
-                  />
-                </div>
-                <p className="text-[9px] font-mono text-foreground/40 mt-1">
-                  Récupéré automatiquement depuis fba-rc.be ou modifiable manuellement.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-foreground/60 mb-1">
-                  Numéro de Transpondeur Personnel (MyLaps / RC4)
-                </label>
-                <div className="relative">
-                  <Radio className="w-3.5 h-3.5 text-foreground/40 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={transponderNumber}
-                    onChange={(e) => setTransponderNumber(e.target.value)}
-                    placeholder="Ex: 7392811"
-                    className="w-full bg-background border border-[#353535] rounded pl-8 pr-3 py-2 text-xs font-mono text-primary font-bold focus:outline-none focus:border-primary"
-                  />
-                </div>
-                <p className="text-[9px] font-mono text-foreground/40 mt-1">
-                  Nécessaire pour le chronométrage officiel des courses et entraînements.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 4 : Consentements & Règlement (Ultra-visible si non cochés) */}
-          <div id="engagements-section" className="pt-2 border-t border-[#353535]/60">
-            {!roiAccepted || !insuranceAck ? (
-              <div className="p-5 rounded-lg border-2 border-secondary/90 bg-secondary/15 space-y-4 ring-2 ring-secondary/30 shadow-[0_0_30px_rgba(255,50,0,0.15)] animate-pulse">
-                <div className="flex items-center gap-2 text-secondary font-bold text-xs font-mono">
-                  <AlertTriangle className="w-4 h-4 shrink-0 text-secondary" />
-                  <span>⚠️ OBLIGATOIRE : Vous devez cocher ces deux engagements pour activer votre accès aux circuits et aux courses.</span>
-                </div>
-
-                <div className="space-y-3 pt-1">
-                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={roiAccepted}
-                      onChange={(e) => setRoiAccepted(e.target.checked)}
-                      className="mt-0.5 rounded border-[#353535] text-primary focus:ring-primary h-4 w-4"
-                    />
-                    <span className="text-xs font-mono text-white font-medium leading-relaxed">
-                      J'atteste avoir lu et j'accepte sans réserve le <strong>Règlement d'Ordre Intérieur (ROI)</strong> du Seraing Buggy Club ASBL. *
-                    </span>
-                  </label>
-
-                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={insuranceAck}
-                      onChange={(e) => setInsuranceAck(e.target.checked)}
-                      className="mt-0.5 rounded border-[#353535] text-primary focus:ring-primary h-4 w-4"
-                    />
-                    <span className="text-xs font-mono text-white font-medium leading-relaxed">
-                      J'ai pris connaissance des conditions d'assurance FBA et de l'obligation de check-in géolocalisé lors de toute présence sur piste. *
-                    </span>
-                  </label>
-                </div>
-              </div>
-            ) : (
-              <div className="p-4 rounded-lg border border-success/30 bg-success/10 space-y-3">
-                <div className="flex items-center gap-2 text-success font-bold text-xs font-mono">
-                  <CheckCircle2 className="w-4 h-4 shrink-0 text-success" />
-                  <span>Engagements réglementaires & Assurance FBA validés</span>
-                </div>
-
-                <div className="space-y-2 pt-1 text-[11px] font-mono text-foreground/80">
-                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={roiAccepted}
-                      onChange={(e) => setRoiAccepted(e.target.checked)}
-                      className="mt-0.5 rounded border-[#353535] text-primary focus:ring-primary"
-                    />
-                    <span>Règlement d'Ordre Intérieur (ROI) du SBC ASBL accepté.</span>
-                  </label>
-
-                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={insuranceAck}
-                      onChange={(e) => setInsuranceAck(e.target.checked)}
-                      className="mt-0.5 rounded border-[#353535] text-primary focus:ring-primary"
-                    />
-                    <span>Conditions d'assurance FBA et check-in géolocalisé approuvés.</span>
-                  </label>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Bouton d'enregistrement unique */}
-          <div className="pt-3">
-            <button
-              type="submit"
-              disabled={savingProfile}
-              className="w-full sm:w-auto premium-btn text-xs px-8 py-3 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              <span className="transform skew-x-8">
-                {savingProfile ? 'Enregistrement en cours...' : 'Enregistrer mon profil pilote'}
-              </span>
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* 5. Centre de Confidentialité & Préférences RGPD (Conformité APD) */}
+      {/* 7. Centre de Confidentialité & Préférences RGPD (Conformité APD) */}
       <section id="privacy-section" className="w-full">
         <MemberPrivacyCenter member={effectiveProfile} onUpdate={refreshAuth} />
       </section>
 
-      {/* 6. Modale de Lecture des Documents Officiels (ROI & Charte) */}
-      {activeDocModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto premium-card p-6 md:p-8 rounded-lg border border-[#353535] relative shadow-2xl space-y-5">
-            <button
-              onClick={() => setActiveDocModal(null)}
-              className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-surface border border-transparent hover:border-[#353535] text-foreground/50 hover:text-white transition-all cursor-pointer"
-              title="Fermer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            {activeDocModal === 'roi' ? (
-              <div className="space-y-4 font-mono text-xs text-foreground/80">
-                <div className="border-b border-[#353535] pb-3">
-                  <h3 className="font-anybody font-black text-xl uppercase tracking-tight sport-skew text-white">
-                    Règlement d'Ordre Intérieur (ROI)
-                  </h3>
-                  <p className="text-[10px] text-primary mt-0.5">Seraing Buggy Club ASBL • Affilié FBA</p>
-                </div>
-
-                <div className="space-y-3 leading-relaxed text-[11px]">
-                  <p><strong>Article 1 - Accès aux infrastructures :</strong> L'accès aux pistes et aux stands est réservé aux membres en règle de cotisation et aux pilotes munis d'un pass journalier validé.</p>
-                  <p><strong>Article 2 - Sécurité & Assurance :</strong> Tout pilote présent sur le complexe doit impérativement activer son check-in sur l'application officielle afin de garantir sa couverture d'assurance FBA.</p>
-                  <p><strong>Article 3 - Matériel & Motorisation :</strong> Sont admis les buggies et truggies 1/8ème et 1/10ème électriques et thermiques conformes aux normes sonores et de sécurité FBA.</p>
-                  <p><strong>Article 4 - Sens de circulation & Ramassage :</strong> Le sens de circulation balisé sur la piste doit être strictement respecté. Le ramassage s'effectue avec gilet de sécurité dans les zones prévues.</p>
-                  <p><strong>Article 5 - Fermeture & Cadenas :</strong> Le dernier membre quittant les installations est tenu de vérifier la mise hors tension des stands et le reverrouillage strict du cadenas d'entrée.</p>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4 font-mono text-xs text-foreground/80">
-                <div className="border-b border-[#353535] pb-3">
-                  <h3 className="font-anybody font-black text-xl uppercase tracking-tight sport-skew text-white">
-                    Charte Sportive & Convivialité
-                  </h3>
-                  <p className="text-[10px] text-primary mt-0.5">Seraing Buggy Club ASBL</p>
-                </div>
-
-                <div className="space-y-3 leading-relaxed text-[11px]">
-                  <p><strong>Esprit de Club :</strong> Le SBC est une association de passionnés où règnent le respect mutuel, la bienveillance et le partage des connaissances mécaniques et de pilotage.</p>
-                  <p><strong>Fair-Play en Piste :</strong> Laisser passer les pilotes plus rapides lors des entraînements libres, éviter les contacts volontaires et préserver le matériel de chacun.</p>
-                  <p><strong>Entraide aux Stands :</strong> Faciliter l'intégration des nouveaux pilotes et participer activement aux sessions bénévoles de maintenance du tracé.</p>
-                  <p><strong>Propreté :</strong> Ne rien jeter au sol, évacuer ses déchets et maintenir les tables de stands propres.</p>
-                </div>
-              </div>
-            )}
-
-            <div className="pt-3 border-t border-[#353535] flex justify-end">
-              <button
-                onClick={() => setActiveDocModal(null)}
-                className="premium-btn text-xs px-6 py-2"
-              >
-                <span className="transform skew-x-8">Fermer la lecture</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 8. Modale de Lecture des Documents Officiels (ROI & Charte - Composant Découplé) */}
+      <OfficialDocumentsModal
+        activeDoc={activeDocModal}
+        onClose={() => setActiveDocModal(null)}
+      />
 
       {/* Modale de Paiement de Cotisation */}
       {paymentModalOpen && (

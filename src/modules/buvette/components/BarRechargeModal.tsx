@@ -100,7 +100,7 @@ export default function BarRechargeModal({ member, isOpen, onClose }: BarRecharg
           {/* Sélecteur de montant rapide */}
           <div className="space-y-2">
             <label className="text-[10px] text-foreground/60 uppercase font-bold block">
-              Montant à créditer :
+              Montant du pack à créditer (min. 10 €) :
             </label>
             <div className="grid grid-cols-4 gap-2">
               {[10, 20, 50, 100].map((preset) => (
@@ -121,11 +121,11 @@ export default function BarRechargeModal({ member, isOpen, onClose }: BarRecharg
             <div className="flex items-center gap-2 mt-2">
               <input
                 type="number"
-                min="1"
-                step="0.50"
+                min="10"
+                step="1"
                 value={amount || ''}
                 onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))}
-                placeholder="Autre montant..."
+                placeholder="Autre montant (min. 10 €)..."
                 className="flex-1 bg-surface border border-[#353535] rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-primary"
               />
               <span className="font-bold text-foreground/60">EUR (€)</span>

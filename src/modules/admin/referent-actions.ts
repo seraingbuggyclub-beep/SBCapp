@@ -9,13 +9,14 @@ import {
   TrackItem,
   getErrorMessage,
 } from '@/types/models';
+import { getTracks } from '@/modules/tracks/actions';
 import { isSuperAdmin } from './permissions';
 
 const DEFAULT_TRACKS_FALLBACK: TrackItem[] = [
-  { id: 'track-1-10', name: 'Piste Astro 1/10', slug: 'astro-1-10', type: '1/10 Electric', is_open: true, status: 'OPEN' },
-  { id: 'track-1-8', name: 'Piste Multi 1/8', slug: 'multi-1-8', type: '1/8 Nitro & Elec', is_open: true, status: 'OPEN' },
-  { id: 'track-vintage-rallye', name: 'Piste Terre Vintage / Rallye Game', slug: 'terre-vintage-rallye', type: 'Vintage & Rallye', is_open: true, status: 'OPEN' },
-  { id: 'track-crawler-scale', name: 'Piste Crawler / Scale', slug: 'crawler-scale', type: 'Crawler & Scale', is_open: true, status: 'OPEN' },
+  { id: '11111111-1111-4111-8111-111111111111', name: 'Piste Astro 1/10', slug: 'astro-1-10', type: '1/10 Electric', is_open: true, status: 'OPEN', order_index: 1 },
+  { id: '22222222-2222-4222-8222-222222222222', name: 'Piste Multi 1/8', slug: 'multi-1-8', type: '1/8 Nitro & Elec', is_open: true, status: 'OPEN', order_index: 2 },
+  { id: '33333333-3333-4333-8333-333333333333', name: 'Piste Terre Vintage / Rallye Game', slug: 'terre-vintage-rallye', type: 'Vintage & Rallye', is_open: true, status: 'OPEN', order_index: 3 },
+  { id: '44444444-4444-4444-8444-444444444444', name: 'Piste Crawler / Scale', slug: 'crawler-scale', type: 'Crawler & Scale', is_open: true, status: 'OPEN', order_index: 4 },
 ];
 
 /**
@@ -23,17 +24,11 @@ const DEFAULT_TRACKS_FALLBACK: TrackItem[] = [
  */
 export async function getAvailableTracks(): Promise<{ data: TrackItem[]; error: string | null }> {
   try {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from('tracks')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (error || !data || data.length === 0) {
-      return { data: DEFAULT_TRACKS_FALLBACK, error: null };
+    const res = await getTracks();
+    if (res.error || !res.data || res.data.length === 0) {
+      return { data: DEFAULT_TRACKS_FALLBACK, error: res.error };
     }
-
-    return { data: data as TrackItem[], error: null };
+    return { data: res.data, error: null };
   } catch (err: unknown) {
     return { data: DEFAULT_TRACKS_FALLBACK, error: getErrorMessage(err) };
   }

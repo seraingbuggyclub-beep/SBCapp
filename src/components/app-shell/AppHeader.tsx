@@ -58,7 +58,7 @@ export default function AppHeader() {
   const navLinks = [
     { href: '/', label: 'Accueil' },
     { href: '/events', label: 'Courses & Calendrier' },
-    { href: '/check-in', label: 'Check-in Piste' },
+    { href: '/check-in', label: 'Check-in Site' },
     ...(canManageBar ? [{ href: '/buvette', label: 'Buvette' }] : []),
     { href: '/dashboard', label: 'Espace Pilote' },
     { href: '/pit-lane', label: 'Pit-Lane' },

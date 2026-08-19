@@ -17,6 +17,7 @@ import FeedbackIdeasWidget from '@/modules/feedback/components/widgets/FeedbackI
 import ProfileEditForm from '@/modules/members/components/ProfileEditForm';
 import OfficialDocumentsModal from '@/modules/members/components/OfficialDocumentsModal';
 import BarRechargeModal from '@/modules/buvette/components/BarRechargeModal';
+import TracksLiveStatus from '@/modules/tracks/components/TracksLiveStatus';
 import {
   AlertTriangle,
   Calendar,
@@ -247,7 +248,7 @@ export default function DashboardPage() {
                 className="px-5 py-2.5 rounded bg-surface hover:bg-surface-high border border-[#353535] hover:border-primary text-xs font-anybody font-bold uppercase tracking-wider text-white flex items-center gap-2 transition-all cursor-pointer sport-skew"
               >
                 <MapPin className="w-4 h-4 text-primary" />
-                <span className="transform skew-x-8">Prendre la piste / Check-in</span>
+                <span className="transform skew-x-8">S&apos;enregistrer sur site</span>
               </Link>
             </>
           ) : (
@@ -267,6 +268,11 @@ export default function DashboardPage() {
       {/* Pointage Officiel FBA en direct */}
       <section className="w-full">
         <PilotAttendanceWidget member={effectiveProfile} />
+      </section>
+
+      {/* État des Pistes & Météo en Direct */}
+      <section className="w-full">
+        <TracksLiveStatus title="État des Pistes en Direct" />
       </section>
 
       {/* 2. Grille des Widgets Clés (Cadenas, Solde Buvette, Assurance FBA, Setups) */}

@@ -128,19 +128,6 @@ export default function AttendanceRegisterTable({
             </button>
           </div>
 
-          {/* Filtre Piste */}
-          <select
-            value={selectedTrackId}
-            onChange={(e) => onTrackChange(e.target.value)}
-            className="bg-background border border-[#353535] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-primary cursor-pointer font-sans"
-          >
-            <option value="all">Toutes les pistes</option>
-            {tracks.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
 
           {/* Actions */}
           <button
@@ -182,20 +169,19 @@ export default function AttendanceRegisterTable({
             <thead>
               <tr className="border-b border-[#353535] bg-surface-dim text-[10px] font-anybody font-bold text-foreground/50 uppercase tracking-wider">
                 <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Pilote</th>
+                <th className="px-4 py-3">Licence FBA</th>
+                <th className="px-4 py-3">Complexe / Site</th>
                 <th className="px-4 py-3">Arrivée</th>
                 <th className="px-4 py-3">Départ</th>
                 <th className="px-4 py-3">Durée</th>
-                <th className="px-4 py-3">Pilote</th>
-                <th className="px-4 py-3">Statut Club</th>
-                <th className="px-4 py-3">N° Licence FBA</th>
-                <th className="px-4 py-3">Piste</th>
                 <th className="px-4 py-3 text-center">Source</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#353535]/50">
               {filteredAttendances.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-10 text-foreground/40">
+                  <td colSpan={8} className="text-center py-10 text-foreground/40">
                     Aucun émargement enregistré pour cette période.
                   </td>
                 </tr>
@@ -214,60 +200,28 @@ export default function AttendanceRegisterTable({
                         {item.check_in_at.split('T')[0]}
                       </td>
 
-                      {/* Arrivée */}
-                      <td className="px-4 py-3 text-white font-bold whitespace-nowrap">
-                        {new Date(item.check_in_at).toLocaleTimeString('fr-FR', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </td>
-
-                      {/* Départ */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {item.check_out_at ? (
-                          <span className="text-foreground/70">
-                            {new Date(item.check_out_at).toLocaleTimeString('fr-FR', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-green-500/15 border border-green-500/30 text-green-400 animate-pulse">
-                            <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                            En Piste
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Durée */}
-                      <td className="px-4 py-3 text-foreground/60 whitespace-nowrap">
-                        {item.duration_minutes ? `${item.duration_minutes} min` : isOngoing ? 'En cours' : '-'}
-                      </td>
-
                       {/* Pilote */}
                       <td className="px-4 py-3">
                         <div className="font-bold text-white font-sans text-xs flex items-center gap-1.5">
                           <User className="w-3.5 h-3.5 text-primary shrink-0" />
                           <span>{fullName}</span>
                         </div>
-                        {isMember && item.sbc_members?.email && (
-                          <div className="text-[10px] text-foreground/45">
-                            {item.sbc_members.email}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Statut Club */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {isMember ? (
-                          <span className="inline-block px-2 py-0.5 rounded bg-primary/10 border border-primary/30 text-primary text-[10px] font-bold">
-                            Membre SBC
-                          </span>
-                        ) : (
-                          <span className="inline-block px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-bold">
-                            Visiteur 1j
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {isMember ? (
+                            <span className="inline-block px-1.5 py-0.2 rounded bg-primary/10 border border-primary/30 text-primary text-[9px] font-bold">
+                              Membre SBC
+                            </span>
+                          ) : (
+                            <span className="inline-block px-1.5 py-0.2 rounded bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[9px] font-bold">
+                              Visiteur 1j
+                            </span>
+                          )}
+                          {isMember && item.sbc_members?.email && (
+                            <span className="text-[10px] text-foreground/45">
+                              {item.sbc_members.email}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Licence FBA */}
@@ -287,9 +241,39 @@ export default function AttendanceRegisterTable({
                         )}
                       </td>
 
-                      {/* Piste */}
-                      <td className="px-4 py-3 text-foreground/80 whitespace-nowrap">
-                        {item.tracks?.name || 'Général'}
+                      {/* Complexe / Site */}
+                      <td className="px-4 py-3 text-foreground/80 whitespace-nowrap font-semibold">
+                        {item.tracks?.name || 'Complexe SBC'}
+                      </td>
+
+                      {/* Arrivée */}
+                      <td className="px-4 py-3 text-white font-bold whitespace-nowrap">
+                        {new Date(item.check_in_at).toLocaleTimeString('fr-FR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </td>
+
+                      {/* Départ */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {item.check_out_at ? (
+                          <span className="text-foreground/70 font-mono">
+                            {new Date(item.check_out_at).toLocaleTimeString('fr-FR', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold uppercase bg-green-500/15 border border-green-500/30 text-green-400 animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                            Sur Site
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Durée */}
+                      <td className="px-4 py-3 text-foreground/60 whitespace-nowrap">
+                        {item.duration_minutes ? `${item.duration_minutes} min` : isOngoing ? 'En cours' : '-'}
                       </td>
 
                       {/* Source */}

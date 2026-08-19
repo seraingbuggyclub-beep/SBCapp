@@ -1,9 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { checkInMember, checkOutMember } from '../actions';
-import { ToggleLeft, ToggleRight, Radio, Compass, Navigation } from 'lucide-react';
-import { usePresenceZone, SBC_LAT, SBC_LNG, GEOFENCE_RADIUS_METERS, calculateHaversineDistance } from '../contexts/PresenceZoneContext';
+import { ToggleLeft, ToggleRight, Radio, Compass, Navigation, LogOut } from 'lucide-react';
+import {
+  usePresenceZone,
+  SBC_LAT,
+  SBC_LNG,
+  GEOFENCE_RADIUS_METERS,
+  calculateHaversineDistance,
+} from '../contexts/PresenceZoneContext';
 import { PresenceSession, getErrorMessage } from '@/types/models';
 
 interface CheckInToggleProps {
@@ -16,7 +22,7 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
   const [presence, setPresence] = useState<PresenceSession | null>(initialPresence);
   const [checkInType, setCheckInType] = useState<'auto' | 'manual'>('auto');
   const [isPublic, setIsPublic] = useState(true);
-  
+
   const [loading, setLoading] = useState(false);
   const [geolocating, setGeolocating] = useState(false);
   const [statusLog, setStatusLog] = useState<string[]>([]);
@@ -24,7 +30,7 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [insideGeofence, setInsideGeofence] = useState<boolean | null>(null);
 
-  const isMountedRef = React.useRef(true);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -33,19 +39,20 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
     };
   }, []);
 
-  // Haversine formula to compute distance in meters
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    return calculateHaversineDistance(lat1, lon1, lat2, lon2);
-  };
+  // Sync initialPresence if updated from context
+  useEffect(() => {
+    if (presenceContext.activePresence !== undefined) {
+      setPresence(presenceContext.activePresence);
+    }
+  }, [presenceContext.activePresence]);
 
-  // Log status helper
   const logStatus = (msg: string) => {
     if (isMountedRef.current) {
-      setStatusLog((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 4)]);
+      setStatusLog((prev) => [`[${new Date().toLocaleTimeString('fr-BE')}] ${msg}`, ...prev.slice(0, 4)]);
     }
   };
 
-  // Get location and check geofence
+  // Obtenir la position GPS et vérifier la zone géofencée
   const verifyLocation = useCallback((): Promise<{ lat: number; lng: number; inside: boolean } | null> => {
     return new Promise((resolve) => {
       if (typeof window === 'undefined' || !navigator.geolocation) {
@@ -66,16 +73,17 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
           const { latitude, longitude } = position.coords;
           setCoords({ lat: latitude, lng: longitude });
 
-          const dist = calculateDistance(latitude, longitude, SBC_LAT, SBC_LNG);
-          setDistance(Math.round(dist));
+          const dist = calculateHaversineDistance(latitude, longitude, SBC_LAT, SBC_LNG);
+          const roundedDist = Math.round(dist);
+          setDistance(roundedDist);
 
           const inside = dist <= GEOFENCE_RADIUS_METERS;
           setInsideGeofence(inside);
           setGeolocating(false);
 
-          logStatus(`GPS trouvé. Distance du club : ${Math.round(dist)}m.`);
-          logStatus(inside ? "Vous êtes dans la zone autorisée (Seraing Buggy Club)." : "Vous êtes hors zone (limite 150m).");
-          
+          logStatus(`GPS trouvé. Distance du club : ${roundedDist}m.`);
+          logStatus(inside ? "✅ Vous êtes dans la zone autorisée (Seraing Buggy Club)." : "❌ Vous êtes hors zone (limite 150m).");
+
           resolve({ lat: latitude, lng: longitude, inside });
         },
         (error) => {
@@ -83,42 +91,45 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
           logStatus(`Erreur GPS : ${error.message}`);
           resolve(null);
         },
-        { enableHighAccuracy: true, timeout: 10000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     });
   }, []);
 
-  const handleCheckIn = useCallback(async (latitude?: number, longitude?: number, typeOverride?: 'manual' | 'auto') => {
-    setLoading(true);
-    const finalType = typeOverride || checkInType;
-    
-    try {
-      const { data, error } = await checkInMember({
-        member_id: memberId,
-        check_in_type: finalType,
-        latitude,
-        longitude,
-        is_public: isPublic,
-      });
+  const handleCheckIn = useCallback(
+    async (latitude?: number, longitude?: number, typeOverride?: 'manual' | 'auto') => {
+      setLoading(true);
+      const finalType = typeOverride || checkInType;
 
-      if (error) {
-        logStatus(`Erreur d'enregistrement : ${error}`);
-      } else {
-        setPresence((data as PresenceSession) || null);
-        logStatus(`Présence validée en mode ${finalType === 'auto' ? 'Automatique' : 'Manuel'}.`);
-        await presenceContext.refreshPresence();
+      try {
+        const { data, error } = await checkInMember({
+          member_id: memberId,
+          check_in_type: finalType,
+          latitude,
+          longitude,
+          is_public: isPublic,
+        });
+
+        if (error) {
+          logStatus(`Erreur d'enregistrement : ${error}`);
+        } else {
+          setPresence((data as PresenceSession) || null);
+          logStatus(`✅ Présence validée en mode ${finalType === 'auto' ? 'Automatique' : 'Manuel'}.`);
+          await presenceContext.refreshPresence();
+        }
+      } catch (err: unknown) {
+        logStatus(`Erreur système : ${getErrorMessage(err)}`);
+      } finally {
+        if (isMountedRef.current) setLoading(false);
       }
-    } catch (err: unknown) {
-      logStatus(`Erreur système : ${getErrorMessage(err)}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [checkInType, memberId, isPublic, presenceContext]);
+    },
+    [checkInType, memberId, isPublic, presenceContext]
+  );
 
-  // Automatic triggers on mount or mode change
+  // Déclenchement automatique en mode Auto si pas encore de présence active
   useEffect(() => {
     if (checkInType === 'auto' && !presence) {
-      logStatus("Mode Auto activé. Lancement du radar de zone...");
+      logStatus("Mode Auto actif. Lancement du radar de zone...");
       verifyLocation().then((loc) => {
         if (loc?.inside) {
           logStatus("Validation radar positive. Enregistrement automatique...");
@@ -131,8 +142,7 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
   const triggerManualCheckIn = async () => {
     logStatus("Lancement du check-in manuel...");
     const loc = await verifyLocation();
-    
-    // Pour le check-in manuel, validation dans le rayon pour la conformité assurance FBA
+
     if (loc) {
       if (loc.inside) {
         await handleCheckIn(loc.lat, loc.lng, 'manual');
@@ -140,7 +150,6 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
         logStatus("Check-in manuel bloqué : Vous devez être sur place (rayon 150m).");
       }
     } else {
-      // Fallback si pas de GPS mais que l'utilisateur valide
       logStatus("GPS indisponible. Autorisation exceptionnelle sans coordonnées.");
       await handleCheckIn(undefined, undefined, 'manual');
     }
@@ -149,7 +158,7 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
   const handleCheckOut = async () => {
     if (!presence) return;
     setLoading(true);
-    logStatus("Déconnexion de la piste...");
+    logStatus("Déconnexion du site...");
 
     try {
       const { error } = await checkOutMember(presence.id);
@@ -160,25 +169,29 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
         setDistance(null);
         setCoords(null);
         setInsideGeofence(null);
-        logStatus("Check-out effectué. Vous n'êtes plus encodé en piste.");
+        logStatus("👋 Check-out effectué. Vous n'êtes plus encodé sur le site.");
         await presenceContext.refreshPresence();
       }
     } catch (err: unknown) {
       logStatus(`Erreur système : ${getErrorMessage(err)}`);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) setLoading(false);
     }
   };
 
   return (
     <div className="w-full space-y-6">
-      {/* Geofencing active header status */}
+      {/* Statut principal et commandes */}
       <div className="premium-card p-6 rounded-lg border border-[#353535]">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-              presence ? 'bg-success/15 text-success border border-success/30' : 'bg-primary/10 text-primary border border-primary/20'
-            }`}>
+            <div
+              className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                presence
+                  ? 'bg-success/15 text-success border border-success/30'
+                  : 'bg-primary/10 text-primary border border-primary/20'
+              }`}
+            >
               {presence ? (
                 <Radio className="w-5 h-5 animate-pulse" />
               ) : (
@@ -187,11 +200,11 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
             </div>
             <div>
               <h3 className="font-anybody font-black text-base text-white uppercase tracking-tight sport-skew">
-                {presence ? 'Statut : En Piste' : 'Statut : Hors Piste'}
+                {presence ? 'Statut : Sur Site' : 'Statut : Hors Site'}
               </h3>
               <p className="text-[11px] text-foreground/50 font-mono">
-                {presence 
-                  ? `Check-in enregistré à ${new Date(presence.check_in_time).toLocaleTimeString()}`
+                {presence
+                  ? `Check-in enregistré à ${new Date(presence.check_in_time).toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' })}`
                   : 'Enregistrez votre présence pour être couvert par la FBA'}
               </p>
             </div>
@@ -216,7 +229,7 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
           </div>
         </div>
 
-        {/* Action button */}
+        {/* Boutons d'actions */}
         <div className="mt-6 flex flex-col sm:flex-row gap-4 items-center">
           {presence ? (
             <button
@@ -225,13 +238,13 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
               className="w-full sm:w-auto px-6 py-2.5 bg-secondary text-white font-anybody font-extrabold uppercase text-xs tracking-wider border border-black hover:bg-red-700 transition-all sport-skew shadow-[3px_3px_0px_#000] cursor-pointer"
             >
               <span className="transform skew-x-8 flex items-center gap-1.5 justify-center">
-                <Navigation className="w-4 h-4" />
+                <LogOut className="w-4 h-4" />
                 Signaler mon départ (Check-out)
               </span>
             </button>
           ) : (
             <div className="flex flex-col sm:flex-row gap-3 w-full">
-              {/* Type toggle */}
+              {/* Sélecteur de mode */}
               <div className="grid grid-cols-2 p-1 bg-surface-dim rounded border border-[#353535] sm:max-w-70">
                 <button
                   onClick={() => setCheckInType('auto')}
@@ -259,7 +272,7 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
                 <button
                   onClick={triggerManualCheckIn}
                   disabled={loading || geolocating}
-                  className="w-full sm:w-auto px-6 py-2.5 bg-primary text-black font-anybody font-extrabold uppercase text-xs tracking-wider border border-black hover:bg-secondary hover:text-white transition-all sport-skew shadow-[3px_3px_0px_#000] cursor-pointer"
+                  className="w-full sm:w-auto px-6 py-2.5 bg-primary text-black font-anybody font-extrabold uppercase text-xs tracking-wider border border-black hover:bg-secondary hover:text-white transition-all sport-skew shadow-[3px_3px_0px_#000] cursor-pointer disabled:opacity-50"
                 >
                   <span className="transform skew-x-8 flex items-center gap-1.5 justify-center">
                     <Navigation className="w-4 h-4" />
@@ -270,10 +283,10 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
                 <button
                   onClick={() => verifyLocation()}
                   disabled={loading || geolocating}
-                  className="w-full sm:w-auto px-6 py-2.5 bg-[#222] text-white font-anybody font-extrabold uppercase text-xs tracking-wider border border-[#353535] hover:bg-[#333] transition-all sport-skew shadow-[3px_3px_0px_#000] cursor-pointer"
+                  className="w-full sm:w-auto px-6 py-2.5 bg-[#222] text-white font-anybody font-extrabold uppercase text-xs tracking-wider border border-[#353535] hover:bg-[#333] transition-all sport-skew shadow-[3px_3px_0px_#000] cursor-pointer disabled:opacity-50"
                 >
                   <span className="transform skew-x-8 flex items-center gap-1.5 justify-center">
-                    <Navigation className="w-4 h-4" />
+                    <Navigation className={`w-4 h-4 ${geolocating ? 'animate-spin' : ''}`} />
                     Relancer le Radar Auto
                   </span>
                 </button>
@@ -283,14 +296,16 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
         </div>
       </div>
 
-      {/* Geofence Radar details */}
+      {/* Console Radar & Télémétrie GPS */}
       <div className="premium-card p-5 rounded-lg border border-[#353535]">
         <h4 className="font-anybody font-black text-xs uppercase tracking-wider text-white sport-skew mb-3">
           Console Radar & Télémétrie GPS
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div className="p-3 rounded bg-surface-dim border border-[#353535]/65 font-mono text-[11px] space-y-1.5 text-foreground/75">
-            <div><span className="text-primary font-bold">Cible Club :</span> 50.599627, 5.529321</div>
+            <div>
+              <span className="text-primary font-bold">Cible Club :</span> {SBC_LAT}, {SBC_LNG}
+            </div>
             <div>
               <span className="text-primary font-bold">Votre position :</span>{' '}
               {coords ? `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}` : 'Indéterminée'}
@@ -311,7 +326,7 @@ export default function CheckInToggle({ memberId, initialPresence }: CheckInTogg
             </div>
           </div>
 
-          {/* Real-time status logs */}
+          {/* Logs en temps réel */}
           <div className="p-3 rounded bg-surface-dim border border-[#353535]/65 font-mono text-[10px] space-y-1 text-foreground/50 h-25 overflow-y-auto">
             {statusLog.length === 0 ? (
               <div className="italic">Radar passif. En attente d'action...</div>

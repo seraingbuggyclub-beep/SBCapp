@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { PresenceSession, PresenceZoneState } from '@/types/models';
+import { checkOutByMemberId } from '../actions';
 
 // Coordonnées du terrain Seraing Buggy Club
 export const SBC_LAT = 50.599627;
@@ -40,17 +41,11 @@ export function PresenceZoneProvider({ children }: { children: React.ReactNode }
   const [distance, setDistance] = useState<number | null>(null);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [activePresence, setActivePresence] = useState<PresenceSession | null>(null);
-  const [loadingLocation, setLoadingLocation] = useState<boolean>(true);
+  const [loadingLocation, setLoadingLocation] = useState<boolean>(false);
   const [loadingPresence, setLoadingPresence] = useState<boolean>(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // References pour le filtrage du deadband GPS et la prévention des memory leaks
   const isMountedRef = useRef<boolean>(true);
-  const lastDistanceRef = useRef<number | null>(null);
-  const lastIsInZoneRef = useRef<boolean>(false);
-  const lastUpdateTimeRef = useRef<number>(0);
-  const watchIdRef = useRef<number | null>(null);
-
   const supabase = useMemo(() => createClient(), []);
 
   // 1. Rafraîchir la présence active de l'utilisateur connecté
@@ -60,7 +55,7 @@ export function PresenceZoneProvider({ children }: { children: React.ReactNode }
     try {
       setLoadingPresence(true);
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!isMountedRef.current) return;
 
       if (!session?.user) {
@@ -91,7 +86,7 @@ export function PresenceZoneProvider({ children }: { children: React.ReactNode }
         setActivePresence(null);
       }
     } catch (err) {
-      console.error("Erreur lors de la vérification de présence:", err);
+      console.error('Erreur lors de la vérification de présence:', err);
     } finally {
       if (isMountedRef.current) {
         setLoadingPresence(false);
@@ -99,47 +94,7 @@ export function PresenceZoneProvider({ children }: { children: React.ReactNode }
     }
   }, [supabase]);
 
-  // 2. Traiter la géolocalisation avec Deadband / Throttling
-  const handlePosition = useCallback((position: GeolocationPosition) => {
-    if (!isMountedRef.current) return;
-
-    const { latitude, longitude } = position.coords;
-    const rawDist = calculateHaversineDistance(latitude, longitude, SBC_LAT, SBC_LNG);
-    const roundedDist = Math.round(rawDist);
-    const newIsInZone = rawDist <= GEOFENCE_RADIUS_METERS;
-    const now = Date.now();
-
-    // Vérification du seuil (Deadband) :
-    // - Si la zone bascule (in -> out ou out -> in), MISE À JOUR IMMÉDIATE
-    // - Sinon, ignorer si l'écart est < 3m et que moins de 4 secondes se sont écoulées
-    if (lastDistanceRef.current !== null) {
-      const isZoneBoundaryCrossed = newIsInZone !== lastIsInZoneRef.current;
-      const distanceDelta = Math.abs(roundedDist - lastDistanceRef.current);
-      const isTimeElapsed = now - lastUpdateTimeRef.current > 4000;
-
-      if (!isZoneBoundaryCrossed && distanceDelta < GPS_DEADBAND_METERS && !isTimeElapsed) {
-        setLoadingLocation(false);
-        return;
-      }
-    }
-
-    lastDistanceRef.current = roundedDist;
-    lastIsInZoneRef.current = newIsInZone;
-    lastUpdateTimeRef.current = now;
-
-    setCoords({ lat: latitude, lng: longitude });
-    setDistance(roundedDist);
-    setIsInZone(newIsInZone);
-    setLoadingLocation(false);
-  }, []);
-
-  const handleGeoError = useCallback((_err: GeolocationPositionError) => {
-    if (isMountedRef.current) {
-      setLoadingLocation(false);
-    }
-  }, []);
-
-  // 3. Rafraîchir ponctuellement la position GPS
+  // 2. Scan GPS one-shot (appelé à la demande ou au réveil d'écran)
   const refreshLocation = useCallback(async (): Promise<void> => {
     if (typeof window === 'undefined' || !navigator.geolocation) {
       if (isMountedRef.current) setLoadingLocation(false);
@@ -150,24 +105,73 @@ export function PresenceZoneProvider({ children }: { children: React.ReactNode }
 
     return new Promise((resolve) => {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          if (isMountedRef.current) {
-            handlePosition(pos);
-          }
+        (position) => {
+          if (!isMountedRef.current) { resolve(); return; }
+          const { latitude, longitude } = position.coords;
+          const rawDist = calculateHaversineDistance(latitude, longitude, SBC_LAT, SBC_LNG);
+          const roundedDist = Math.round(rawDist);
+          setCoords({ lat: latitude, lng: longitude });
+          setDistance(roundedDist);
+          setIsInZone(rawDist <= GEOFENCE_RADIUS_METERS);
+          setLoadingLocation(false);
           resolve();
         },
-        (err) => {
-          if (isMountedRef.current) {
-            handleGeoError(err);
-          }
+        () => {
+          if (isMountedRef.current) setLoadingLocation(false);
           resolve();
         },
-        { enableHighAccuracy: false, timeout: 8000, maximumAge: 30000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     });
-  }, [handlePosition, handleGeoError]);
+  }, []);
 
-  // Cycle de vie initial et écoute auth
+  // 3. Détection au réveil d'écran : visibilitychange + focus
+  //    Si une session est active ET qu'on est hors zone → checkout automatique
+  useEffect(() => {
+    const handleWakeUp = async () => {
+      if (!isMountedRef.current || !isCheckedIn || !currentUserId) return;
+      if (typeof window === 'undefined' || !navigator.geolocation) return;
+
+      // Scan GPS immédiat
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          if (!isMountedRef.current) return;
+          const { latitude, longitude } = position.coords;
+          const dist = calculateHaversineDistance(latitude, longitude, SBC_LAT, SBC_LNG);
+          const roundedDist = Math.round(dist);
+          setCoords({ lat: latitude, lng: longitude });
+          setDistance(roundedDist);
+          const inside = dist <= GEOFENCE_RADIUS_METERS;
+          setIsInZone(inside);
+
+          if (!inside) {
+            // Hors zone → clôture automatique de la session
+            console.info(`[SBC Radar] Hors zone (${roundedDist}m). Checkout automatique.`);
+            await checkOutByMemberId(currentUserId);
+            await refreshPresence();
+          }
+        },
+        () => { /* Silencieux si GPS indisponible */ },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      );
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        handleWakeUp();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleWakeUp);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleWakeUp);
+    };
+  }, [isCheckedIn, currentUserId, refreshPresence]);
+
+  // 4. Cycle de vie initial et écoute auth
   useEffect(() => {
     isMountedRef.current = true;
     refreshPresence();
@@ -191,30 +195,7 @@ export function PresenceZoneProvider({ children }: { children: React.ReactNode }
     };
   }, [refreshPresence, supabase]);
 
-  // Suivi continu de géolocalisation avec nettoyage systématique (une seule souscription)
-  useEffect(() => {
-    if (typeof window === 'undefined' || !navigator.geolocation) {
-      setLoadingLocation(false);
-      return;
-    }
-
-    // Démarrage d'un unique watchPosition léger
-    const watchId = navigator.geolocation.watchPosition(
-      handlePosition,
-      handleGeoError,
-      { enableHighAccuracy: false, timeout: 15000, maximumAge: 15000 }
-    );
-    watchIdRef.current = watchId;
-
-    return () => {
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
-    };
-  }, [handlePosition, handleGeoError]);
-
-  // Écoute temps réel des changements de présence Supabase
+  // 5. Écoute temps réel des changements de présence Supabase (realtime)
   useEffect(() => {
     if (!currentUserId) return;
 

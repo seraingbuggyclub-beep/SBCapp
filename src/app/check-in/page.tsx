@@ -1,18 +1,16 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { getMemberActivePresence } from '@/modules/presence/actions';
 import CheckInToggle from '@/modules/presence/components/CheckInToggle';
-import CadenasLock from '@/modules/payments/components/CadenasLock';
 import FbaDisclaimer from '@/modules/presence/components/FbaDisclaimer';
 import { KeyRound } from 'lucide-react';
 import Link from 'next/link';
-import PilotAttendanceWidget from '@/modules/attendance/components/PilotAttendanceWidget';
 import { PresenceSession } from '@/types/models';
 
 export default function CheckInPage() {
-  const { user, profile, loading: authLoading, refresh: refreshAuth } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [activePresence, setActivePresence] = useState<PresenceSession | null>(null);
   const [presenceLoading, setPresenceLoading] = useState(true);
 
@@ -36,22 +34,19 @@ export default function CheckInPage() {
     }
 
     fetchPresence();
-
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [user, profile?.payment_status]);
 
   if (authLoading || (user && profile?.payment_status === 'paid' && presenceLoading)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-100 gap-2 font-mono text-xs">
         <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-        <span>Chargement des données GPS...</span>
+        <span>Chargement du module de présence...</span>
       </div>
     );
   }
 
-  // Not logged in
+  // Non connecté
   if (!user) {
     return (
       <div className="max-w-md mx-auto py-10 space-y-6 text-center">
@@ -63,24 +58,20 @@ export default function CheckInPage() {
             Connexion Requise
           </h3>
           <p className="text-xs text-foreground/60 leading-relaxed mb-6 font-mono">
-            Vous devez être connecté avec votre compte pilote pour valider votre présence sur la piste.
+            Vous devez être connecté avec votre compte pilote pour vous enregistrer sur site.
           </p>
-          <Link
-            href="/dashboard"
-            className="premium-btn text-xs w-full flex items-center justify-center"
-          >
+          <Link href="/dashboard" className="premium-btn text-xs w-full flex items-center justify-center">
             <span className="transform skew-x-8">Accéder à la connexion</span>
           </Link>
         </div>
-
         <FbaDisclaimer />
       </div>
     );
   }
 
-  // Engagements ROI / Assurance non acceptés -> Blocage strict
+  // Engagements ROI / Assurance non acceptés → Blocage strict
   const hasAgreements = Boolean(profile?.roi_accepted && profile?.insurance_ack);
-  if (user && !hasAgreements) {
+  if (!hasAgreements) {
     return (
       <div className="max-w-md mx-auto py-10 space-y-6 text-center">
         <div className="premium-card p-6 md:p-8 rounded-lg border-2 border-secondary bg-secondary/10 shadow-[0_0_30px_rgba(255,50,0,0.2)]">
@@ -91,23 +82,19 @@ export default function CheckInPage() {
             Engagements Obligatoires Requis
           </h3>
           <p className="text-xs text-foreground/80 leading-relaxed mb-6 font-mono">
-            Pour être couvert par l'assurance FBA et activer le radar de présence, vous devez obligatoirement accepter le <strong>Règlement d'Ordre Intérieur (ROI)</strong> et les <strong>conditions d'assurance FBA</strong> sur votre profil.
+            Pour être couvert par l&apos;assurance FBA et activer l&apos;enregistrement de présence, vous devez obligatoirement accepter le <strong>Règlement d&apos;Ordre Intérieur (ROI)</strong> et les <strong>conditions d&apos;assurance FBA</strong> sur votre profil.
           </p>
-          <Link
-            href="/dashboard#engagements-section"
-            className="premium-btn text-xs w-full flex items-center justify-center"
-          >
+          <Link href="/dashboard#engagements-section" className="premium-btn text-xs w-full flex items-center justify-center">
             <span className="transform skew-x-8">Valider mes engagements sur le Dashboard</span>
           </Link>
         </div>
-
         <FbaDisclaimer />
       </div>
     );
   }
 
-  // Cotisation pas en règle
-  if (profile && profile.payment_status !== 'paid') {
+  // Cotisation non en règle
+  if (profile?.payment_status !== 'paid') {
     return (
       <div className="max-w-md mx-auto py-10 space-y-6 text-center">
         <div className="premium-card p-6 md:p-8 rounded-lg border border-[#353535]">
@@ -118,12 +105,9 @@ export default function CheckInPage() {
             Cotisation Non Acquittée
           </h3>
           <p className="text-xs text-foreground/60 leading-relaxed mb-6 font-mono">
-            Votre cotisation annuelle est actuellement en attente ou expirée. Veuillez régulariser votre cotisation auprès du club pour accéder au check-in piste.
+            Votre cotisation annuelle est actuellement en attente ou expirée. Veuillez régulariser votre cotisation auprès du club pour accéder à l&apos;enregistrement de présence.
           </p>
-          <Link
-            href="/dashboard"
-            className="premium-btn text-xs w-full flex items-center justify-center"
-          >
+          <Link href="/dashboard" className="premium-btn text-xs w-full flex items-center justify-center">
             <span className="transform skew-x-8">Accéder à mon Espace Pilote</span>
           </Link>
         </div>
@@ -132,14 +116,14 @@ export default function CheckInPage() {
     );
   }
 
-  // En ordre de cotisation -> Afficher le check-in toggle
+  // En ordre → Afficher le module de présence complet
   return (
     <div className="max-w-4xl mx-auto space-y-6 py-4">
-      {/* Header section */}
+      {/* Header */}
       <div className="flex items-center justify-between border-b border-[#353535] pb-4">
         <div>
           <h1 className="font-anybody font-black text-2xl md:text-3xl uppercase tracking-tight sport-skew text-white">
-            Enregistrement <span className="text-primary">Présence</span>
+            Enregistrement <span className="text-primary">Sur Site</span>
           </h1>
           <p className="text-xs text-foreground/50 font-mono mt-1">
             Pilote : {profile?.first_name} {profile?.last_name} • Licence: {profile?.license_number || 'Non encodée'}
@@ -151,13 +135,10 @@ export default function CheckInPage() {
         </div>
       </div>
 
-      {/* Pointage Officiel FBA par piste */}
-      <PilotAttendanceWidget member={profile} />
-
       {/* Mandatory disclaimer */}
       <FbaDisclaimer />
 
-      {/* Check-in toggle component */}
+      {/* Module principal check-in complet */}
       <CheckInToggle memberId={user.id} initialPresence={activePresence} />
     </div>
   );

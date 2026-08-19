@@ -1,5 +1,5 @@
 export type FeedbackType = 'BUG_APP' | 'INCIDENT_TRACK' | 'IDEA';
-export type FeedbackStatus = 'PENDING' | 'IN_PROGRESS' | 'RESOLVED' | 'REJECTED';
+export type FeedbackStatus = 'PENDING' | 'APPROVED' | 'IN_PROGRESS' | 'RESOLVED' | 'DONE' | 'REJECTED';
 export type FeedbackSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
 export interface FeedbackAuthor {

@@ -24,7 +24,7 @@ export default function AppSidebar() {
   const links = [
     { href: '/', label: 'Accueil', icon: Home },
     { href: '/events', label: 'Courses & Calendrier', icon: Calendar },
-    { href: '/check-in', label: 'Check-in Terrain', icon: MapPin },
+    { href: '/check-in', label: 'Check-in Site', icon: MapPin },
     ...(canPosBar ? [{ href: '/buvette', label: 'Caisse Buvette', icon: Coffee }] : []),
     { href: '/dashboard', label: 'Espace Pilote', icon: LayoutDashboard },
     { href: '/pit-lane', label: 'Pit-Lane', icon: Radio },

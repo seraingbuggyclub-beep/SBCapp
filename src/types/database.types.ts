@@ -360,18 +360,36 @@ export interface Database {
           id: string
           name: string
           is_open: boolean
+          status_message: string | null
+          closure_reason: string | null
+          closure_type: string | null
+          reopening_at: string | null
+          order_index: number
+          created_at: string | null
           updated_at: string | null
         }
         Insert: {
           id?: string
           name: string
           is_open?: boolean
+          status_message?: string | null
+          closure_reason?: string | null
+          closure_type?: string | null
+          reopening_at?: string | null
+          order_index?: number
+          created_at?: string | null
           updated_at?: string | null
         }
         Update: {
           id?: string
           name?: string
           is_open?: boolean
+          status_message?: string | null
+          closure_reason?: string | null
+          closure_type?: string | null
+          reopening_at?: string | null
+          order_index?: number
+          created_at?: string | null
           updated_at?: string | null
         }
         Relationships: []

@@ -49,7 +49,7 @@ export default function QuickEventCreateModal({
   const [modalExtLink, setModalExtLink] = useState<string>('');
   const [modalStartTime, setModalStartTime] = useState<string>('09:00');
   const [modalEndTime, setModalEndTime] = useState<string>('18:00');
-  const [modalLocation, setModalLocation] = useState<string>('Seraing Buggy Track, Belgium');
+  const [modalLocation, setModalLocation] = useState<string>('Seraing Buggy Club');
 
   const [modalCategories, setModalCategories] = useState<RaceCategoryItem[]>(DEFAULT_CATEGORIES);
   const [modalMeals, setModalMeals] = useState<MealOptionItem[]>(DEFAULT_MEALS);
@@ -114,11 +114,11 @@ export default function QuickEventCreateModal({
           modalType === 'sbc_race'
             ? 'Course Club SBC'
             : modalType === 'belgian_championship'
-            ? 'Champ. de Belgique'
-            : modalType === 'holiday'
-            ? 'Événement Spécial'
-            : 'Réunion Club',
-        location: modalLocation.trim() || 'Seraing Buggy Track, Belgium',
+              ? 'Champ. de Belgique'
+              : modalType === 'holiday'
+                ? 'Événement Spécial'
+                : 'Réunion Club',
+        location: modalLocation.trim() || 'Seraing Buggy Club',
         registration_fee: modalHasReg && modalCategories[0]?.fee ? modalCategories[0].fee : 0,
         status: 'open',
         event_type: modalType,
@@ -192,11 +192,10 @@ export default function QuickEventCreateModal({
                     if (t.id !== 'sbc_race') setModalHasReg(false);
                     else setModalHasReg(true);
                   }}
-                  className={`p-2 rounded border text-center transition-all cursor-pointer ${
-                    modalType === t.id
-                      ? 'bg-primary/20 border-primary text-primary font-bold'
-                      : 'bg-surface border-[#353535] text-foreground/60 hover:text-white'
-                  }`}
+                  className={`p-2 rounded border text-center transition-all cursor-pointer ${modalType === t.id
+                    ? 'bg-primary/20 border-primary text-primary font-bold'
+                    : 'bg-surface border-[#353535] text-foreground/60 hover:text-white'
+                    }`}
                 >
                   {t.label}
                 </button>

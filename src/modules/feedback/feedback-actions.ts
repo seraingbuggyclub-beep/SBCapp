@@ -29,7 +29,8 @@ export async function getPublicIdeas(
         author:sbc_members!sbc_feedbacks_author_id_fkey(id, first_name, last_name),
         responder:sbc_members!sbc_feedbacks_responded_by_fkey(id, first_name, last_name)
       `)
-      .eq('type', 'IDEA');
+      .eq('type', 'IDEA')
+      .in('status', ['APPROVED', 'IN_PROGRESS', 'RESOLVED', 'DONE']);
 
     if (sortBy === 'top') {
       query = query.order('votes_count', { ascending: false }).order('created_at', { ascending: false });
@@ -362,3 +363,61 @@ export async function updateFeedbackAdminStatus(
     return { success: false, error: message };
   }
 }
+
+/**
+ * Action rapide : Approuve et publie une idée pour affichage public
+ */
+export async function approveIdeaAdmin(
+  feedbackId: string
+): Promise<{ success: boolean; error: string | null }> {
+  return updateFeedbackAdminStatus(feedbackId, 'APPROVED');
+}
+
+/**
+ * Supprime définitivement un ticket feedback en base de données (Réservé aux Administrateurs)
+ */
+export async function deleteFeedbackAdmin(
+  feedbackId: string
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: 'Non authentifié' };
+    }
+
+    const { data: memberProfile } = await supabase
+      .from('sbc_members')
+      .select('role, email')
+      .eq('id', user.id)
+      .single();
+
+    const isSuper = isSuperAdmin(memberProfile?.email || user.email);
+    const isAdmin = memberProfile?.role === 'admin';
+
+    if (!isSuper && !isAdmin) {
+      return { success: false, error: 'Action réservée aux administrateurs.' };
+    }
+
+    const { error } = await supabase
+      .from('sbc_feedbacks')
+      .delete()
+      .eq('id', feedbackId);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/dashboard');
+    revalidatePath('/admin');
+
+    return { success: true, error: null };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Erreur inattendue';
+    return { success: false, error: message };
+  }
+}
+

@@ -85,6 +85,7 @@ export default function FeedbackIdeasWidget({ member }: FeedbackIdeasWidgetProps
   const [ideaDescription, setIdeaDescription] = useState('');
   const [submittingIdea, setSubmittingIdea] = useState(false);
   const [ideaError, setIdeaError] = useState('');
+  const [ideaMsg, setIdeaMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Formulaire Signalement
   const [anomalyType, setAnomalyType] = useState<FeedbackType>('INCIDENT_TRACK');
@@ -179,7 +180,12 @@ export default function FeedbackIdeasWidget({ member }: FeedbackIdeasWidgetProps
       setIdeaTitle('');
       setIdeaDescription('');
       setIdeaModalOpen(false);
+      setIdeaMsg({
+        type: 'success',
+        text: 'Votre idée a été soumise avec succès ! Elle sera visible publiquement après validation par le comité.',
+      });
       fetchIdeas();
+      setTimeout(() => setIdeaMsg(null), 7000);
     } else {
       setIdeaError(error || 'Erreur lors de la soumission de votre idée.');
     }
@@ -233,25 +239,32 @@ export default function FeedbackIdeasWidget({ member }: FeedbackIdeasWidgetProps
       case 'PENDING':
         return (
           <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 flex items-center gap-1">
-            <HelpCircle className="w-3 h-3" /> À l'étude
+            <HelpCircle className="w-3 h-3" /> En attente de modération
+          </span>
+        );
+      case 'APPROVED':
+        return (
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" /> Approuvée
           </span>
         );
       case 'IN_PROGRESS':
         return (
           <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center gap-1">
-            <Clock className="w-3 h-3" /> Retenu / En cours
+            <Clock className="w-3 h-3" /> Retenue / En cours
           </span>
         );
       case 'RESOLVED':
+      case 'DONE':
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3" /> Réalisé
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-green-500/15 border border-green-500/30 text-green-400 flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" /> Réalisée
           </span>
         );
       case 'REJECTED':
         return (
           <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-surface border border-[#353535] text-foreground/50 flex items-center gap-1">
-            <XCircle className="w-3 h-3" /> Non retenu
+            <XCircle className="w-3 h-3" /> Non retenue
           </span>
         );
       default:
@@ -302,7 +315,7 @@ export default function FeedbackIdeasWidget({ member }: FeedbackIdeasWidgetProps
               Boîte à Idées & <span className="text-primary">Signalements</span>
             </h2>
             <p className="text-xs text-foreground/50 font-mono">
-              Participez à l'amélioration continue des pistes et de la vie du club SBC
+              Participez à l&apos;amélioration continue des pistes et de la vie du club SBC
             </p>
           </div>
         </div>
@@ -318,6 +331,25 @@ export default function FeedbackIdeasWidget({ member }: FeedbackIdeasWidgetProps
           </button>
         )}
       </div>
+
+      {/* Message de notification Idée */}
+      {ideaMsg && (
+        <div
+          className={`p-3 rounded font-mono text-xs flex items-center justify-between animate-fade-in ${
+            ideaMsg.type === 'success'
+              ? 'bg-success/15 border border-success/30 text-success'
+              : 'bg-secondary/15 border border-secondary/30 text-secondary'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>{ideaMsg.text}</span>
+          </div>
+          <button onClick={() => setIdeaMsg(null)} className="text-foreground/40 hover:text-white cursor-pointer">
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Navigation Sous-onglets */}
       <div className="flex items-center gap-2 border-b border-[#353535] pb-2">
@@ -354,7 +386,7 @@ export default function FeedbackIdeasWidget({ member }: FeedbackIdeasWidgetProps
           {/* Filtres de tri */}
           <div className="flex items-center justify-between gap-4">
             <span className="text-xs font-mono text-foreground/50">
-              {ideas.length} suggestion{ideas.length > 1 ? 's' : ''} au total
+              {ideas.length} suggestion{ideas.length > 1 ? 's' : ''} approuvée{ideas.length > 1 ? 's' : ''}
             </span>
 
             <div className="flex items-center gap-1.5 bg-surface-dim p-1 rounded border border-[#353535]">
@@ -801,6 +833,14 @@ export default function FeedbackIdeasWidget({ member }: FeedbackIdeasWidgetProps
                 />
               </div>
 
+              {/* Information de modération */}
+              <div className="p-3 rounded bg-surface-dim border border-[#353535] text-[11px] font-mono text-foreground/60 flex items-start gap-2">
+                <HelpCircle className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <span>
+                  Votre proposition sera examinée par le comité avant sa publication officielle sur le tableau public.
+                </span>
+              </div>
+
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
@@ -819,7 +859,7 @@ export default function FeedbackIdeasWidget({ member }: FeedbackIdeasWidgetProps
                   ) : (
                     <Send className="w-4 h-4 transform skew-x-8" />
                   )}
-                  <span className="transform skew-x-8">Publier l'idée</span>
+                  <span className="transform skew-x-8">Soumettre pour validation</span>
                 </button>
               </div>
             </form>

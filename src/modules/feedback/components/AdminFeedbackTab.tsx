@@ -18,6 +18,9 @@ import {
   Loader2,
   X,
   RefreshCw,
+  Trash2,
+  Check,
+  Globe,
 } from 'lucide-react';
 import {
   FeedbackItem,
@@ -28,6 +31,8 @@ import {
 import {
   getAllFeedbacksAdmin,
   updateFeedbackAdminStatus,
+  approveIdeaAdmin,
+  deleteFeedbackAdmin,
 } from '@/modules/feedback/feedback-actions';
 
 export default function AdminFeedbackTab() {
@@ -43,6 +48,11 @@ export default function AdminFeedbackTab() {
   const [saving, setSaving] = useState(false);
   const [actionMsg, setActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Suppression
+  const [deletingItem, setDeletingItem] = useState<FeedbackItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+
   const fetchFeedbacks = useCallback(async () => {
     setLoading(true);
     const { data } = await getAllFeedbacksAdmin(filterType, filterStatus);
@@ -53,6 +63,41 @@ export default function AdminFeedbackTab() {
   useEffect(() => {
     fetchFeedbacks();
   }, [fetchFeedbacks]);
+
+  // Action rapide : Approuver / Publier
+  const handleQuickApprove = async (item: FeedbackItem) => {
+    setApprovingId(item.id);
+    const { success, error } = await approveIdeaAdmin(item.id);
+    setApprovingId(null);
+
+    if (success) {
+      setFeedbacks((prev) =>
+        prev.map((f) => (f.id === item.id ? { ...f, status: 'APPROVED' } : f))
+      );
+      setActionMsg({ type: 'success', text: `Idée "${item.title}" approuvée et publiée !` });
+      setTimeout(() => setActionMsg(null), 3000);
+    } else {
+      setActionMsg({ type: 'error', text: error || 'Erreur lors de l\'approbation.' });
+    }
+  };
+
+  // Action : Supprimer définitivement
+  const handleConfirmDelete = async () => {
+    if (!deletingItem) return;
+    setIsDeleting(true);
+
+    const { success, error } = await deleteFeedbackAdmin(deletingItem.id);
+    setIsDeleting(false);
+    setDeletingItem(null);
+
+    if (success) {
+      setFeedbacks((prev) => prev.filter((f) => f.id !== deletingItem.id));
+      setActionMsg({ type: 'success', text: `Ticket "${deletingItem.title}" supprimé définitivement.` });
+      setTimeout(() => setActionMsg(null), 3000);
+    } else {
+      setActionMsg({ type: 'error', text: error || 'Erreur lors de la suppression.' });
+    }
+  };
 
   const handleOpenProcessModal = (item: FeedbackItem) => {
     setSelectedFeedback(item);
@@ -92,25 +137,32 @@ export default function AdminFeedbackTab() {
       case 'PENDING':
         return (
           <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 flex items-center gap-1">
-            <HelpCircle className="w-3 h-3" /> À l'étude
+            <HelpCircle className="w-3 h-3" /> En attente de modération
+          </span>
+        );
+      case 'APPROVED':
+        return (
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center gap-1">
+            <Globe className="w-3 h-3" /> Approuvée / Publiée
           </span>
         );
       case 'IN_PROGRESS':
         return (
           <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center gap-1">
-            <Clock className="w-3 h-3" /> Retenu / En cours
+            <Clock className="w-3 h-3" /> Retenue / En cours
           </span>
         );
       case 'RESOLVED':
+      case 'DONE':
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3" /> Réalisé
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-green-500/15 border border-green-500/30 text-green-400 flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" /> Réalisée / Clôturée
           </span>
         );
       case 'REJECTED':
         return (
           <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-surface border border-[#353535] text-foreground/50 flex items-center gap-1">
-            <XCircle className="w-3 h-3" /> Non retenu
+            <XCircle className="w-3 h-3" /> Refusée (Masquée)
           </span>
         );
       default:
@@ -163,7 +215,7 @@ export default function AdminFeedbackTab() {
                 Boîte à Idées & <span className="text-primary">Signalements CA</span>
               </h2>
               <p className="text-xs text-foreground/50 font-mono">
-                Consultez, priorisez et traitez les propositions et signalements des membres
+                Modérez, validez et traitez les propositions et signalements des membres
               </p>
             </div>
           </div>
@@ -177,6 +229,22 @@ export default function AdminFeedbackTab() {
             <span>Actualiser</span>
           </button>
         </div>
+
+        {/* Action Message */}
+        {actionMsg && (
+          <div
+            className={`p-3 rounded font-mono text-xs flex items-center justify-between animate-fade-in ${
+              actionMsg.type === 'success'
+                ? 'bg-success/15 border border-success/30 text-success'
+                : 'bg-secondary/15 border border-secondary/30 text-secondary'
+            }`}
+          >
+            <span>{actionMsg.text}</span>
+            <button onClick={() => setActionMsg(null)} className="text-foreground/40 hover:text-white cursor-pointer">
+              ×
+            </button>
+          </div>
+        )}
 
         {/* Filtres Type & Statut */}
         <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-[#353535]">
@@ -199,17 +267,27 @@ export default function AdminFeedbackTab() {
 
           <div className="flex items-center gap-1.5 bg-surface-dim p-1 rounded border border-[#353535]">
             <span className="text-[10px] font-mono text-foreground/40 px-2 uppercase font-bold">Statut :</span>
-            {(['ALL', 'PENDING', 'IN_PROGRESS', 'RESOLVED', 'REJECTED'] as const).map((st) => (
+            {(['ALL', 'PENDING', 'APPROVED', 'IN_PROGRESS', 'RESOLVED', 'REJECTED'] as const).map((st) => (
               <button
                 key={st}
-                onClick={() => setFilterStatus(st)}
+                onClick={() => setFilterStatus(st as FeedbackStatus | 'ALL')}
                 className={`px-3 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                   filterStatus === st
                     ? 'bg-primary text-black'
                     : 'text-foreground/60 hover:text-white'
                 }`}
               >
-                {st === 'ALL' ? 'Tous' : st === 'PENDING' ? 'À l\'étude' : st === 'IN_PROGRESS' ? 'En cours' : st === 'RESOLVED' ? 'Réalisé' : 'Refusé'}
+                {st === 'ALL'
+                  ? 'Tous'
+                  : st === 'PENDING'
+                  ? '🟡 En attente'
+                  : st === 'APPROVED'
+                  ? '🟢 Approuvé'
+                  : st === 'IN_PROGRESS'
+                  ? '🔵 En cours'
+                  : st === 'RESOLVED'
+                  ? '🏁 Réalisé'
+                  : '⚪ Refusé'}
               </button>
             ))}
           </div>
@@ -231,7 +309,11 @@ export default function AdminFeedbackTab() {
           feedbacks.map((item) => (
             <div
               key={item.id}
-              className="premium-card p-5 rounded-lg border border-[#353535] hover:border-primary/40 transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+              className={`premium-card p-5 rounded-lg border transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-4 ${
+                item.status === 'PENDING'
+                  ? 'border-yellow-500/40 bg-yellow-500/5'
+                  : 'border-[#353535] hover:border-primary/40'
+              }`}
             >
               {/* Infos principales */}
               <div className="space-y-2 flex-1">
@@ -277,14 +359,41 @@ export default function AdminFeedbackTab() {
                 </div>
               </div>
 
-              {/* Bouton de modération */}
-              <div className="shrink-0 flex items-center">
+              {/* Boutons d'actions */}
+              <div className="shrink-0 flex items-center gap-2 flex-wrap">
+                {/* Bouton rapide d'approbation si en attente */}
+                {item.status === 'PENDING' && (
+                  <button
+                    onClick={() => handleQuickApprove(item)}
+                    disabled={approvingId === item.id}
+                    title="Valider et publier cette idée publiquement"
+                    className="px-3 py-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-400 font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  >
+                    {approvingId === item.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Check className="w-3.5 h-3.5" />
+                    )}
+                    <span>Approuver / Publier</span>
+                  </button>
+                )}
+
+                {/* Bouton Traiter / Répondre */}
                 <button
                   onClick={() => handleOpenProcessModal(item)}
-                  className="premium-btn py-2 px-4 text-xs flex items-center gap-1.5 cursor-pointer"
+                  className="premium-btn py-2 px-3.5 text-xs flex items-center gap-1.5 cursor-pointer"
                 >
                   <MessageSquare className="w-3.5 h-3.5 transform skew-x-8" />
-                  <span className="transform skew-x-8">Traiter le ticket</span>
+                  <span className="transform skew-x-8">Traiter</span>
+                </button>
+
+                {/* Bouton Supprimer */}
+                <button
+                  onClick={() => setDeletingItem(item)}
+                  title="Supprimer définitivement ce ticket"
+                  className="p-2 rounded-lg bg-surface-dim hover:bg-red-500/20 text-foreground/50 hover:text-red-400 border border-[#353535] hover:border-red-500/40 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -345,10 +454,11 @@ export default function AdminFeedbackTab() {
                   onChange={(e) => setNewStatus(e.target.value as FeedbackStatus)}
                   className="w-full bg-background border border-[#353535] rounded px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
                 >
-                  <option value="PENDING">🟡 À l'étude (En attente d'analyse)</option>
-                  <option value="IN_PROGRESS">🔵 Retenu / En cours de réalisation</option>
-                  <option value="RESOLVED">🟢 Réalisé / Résolu</option>
-                  <option value="REJECTED">⚪ Non retenu / Rejeté</option>
+                  <option value="PENDING">🟡 En attente de modération (Non visible publiquement)</option>
+                  <option value="APPROVED">🟢 Approuvée & Publiée (Visible par les membres)</option>
+                  <option value="IN_PROGRESS">🔵 Retenue / En cours de réalisation</option>
+                  <option value="RESOLVED">🏁 Réalisée / Résolue</option>
+                  <option value="REJECTED">⚪ Non retenue / Rejetée (Masquée du public)</option>
                 </select>
               </div>
 
@@ -388,6 +498,48 @@ export default function AdminFeedbackTab() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DIALOGUE DE CONFIRMATION DE SUPPRESSION */}
+      {deletingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-surface border border-red-500/30 rounded-xl w-full max-w-md p-6 space-y-4 shadow-2xl animate-scale-up">
+            <div className="flex items-center gap-3 text-red-400">
+              <div className="p-2.5 rounded-lg bg-red-500/15 border border-red-500/30">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-anybody font-black text-lg text-white uppercase tracking-tight sport-skew">
+                  Supprimer le Ticket
+                </h3>
+                <p className="text-xs text-foreground/60 font-mono">Action irréversible</p>
+              </div>
+            </div>
+
+            <p className="text-xs font-mono text-foreground/80 leading-relaxed">
+              Êtes-vous sûr de vouloir supprimer définitivement le ticket{' '}
+              <strong className="text-white">&quot;{deletingItem.title}&quot;</strong> ainsi que tous ses votes associés ?
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                onClick={() => setDeletingItem(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-lg bg-surface-high hover:bg-surface border border-[#353535] text-xs font-mono text-foreground/70 hover:text-white transition-colors cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-anybody font-black text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer shadow-lg disabled:opacity-50"
+              >
+                {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                <span>Confirmer la suppression</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

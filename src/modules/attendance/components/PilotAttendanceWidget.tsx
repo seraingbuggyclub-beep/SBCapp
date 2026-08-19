@@ -100,7 +100,7 @@ export default function PilotAttendanceWidget({
     if (res.success && res.data) {
       setActiveSession(res.data);
       setMsg({
-        text: "Pointage FBA enregistré avec succès ! Vous êtes officiellement couvert sur la piste.",
+        text: "Pointage FBA enregistré avec succès ! Vous êtes officiellement couvert sur le complexe.",
         type: 'success',
       });
       if (onAttendanceChange) onAttendanceChange();
@@ -120,7 +120,7 @@ export default function PilotAttendanceWidget({
     if (res.success) {
       setActiveSession(null);
       setMsg({
-        text: "Session de roulage terminée. Merci d'avoir libéré la piste et à bientôt !",
+        text: "Session terminée. Merci et à bientôt sur le complexe !",
         type: 'success',
       });
       if (onAttendanceChange) onAttendanceChange();
@@ -156,7 +156,7 @@ export default function PilotAttendanceWidget({
               Registre de Présence FBA
             </h3>
             <p className="text-[10px] font-mono text-foreground/50">
-              Pointage officiel de présence sur le complexe RC
+              Pointage officiel de présence sur le site
             </p>
           </div>
         </div>
@@ -164,11 +164,11 @@ export default function PilotAttendanceWidget({
         {activeSession ? (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/15 border border-green-500/40 text-green-400 text-[10px] font-mono font-bold uppercase tracking-wider">
             <span className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.8)]" />
-            En Piste
+            Sur Site
           </span>
         ) : (
           <span className="text-[10px] font-mono text-foreground/45 uppercase">
-            Hors Piste
+            Hors Site
           </span>
         )}
       </div>
@@ -212,14 +212,14 @@ export default function PilotAttendanceWidget({
             </div>
 
             <div>
-              <span className="text-[10px] text-foreground/45 uppercase block">Piste Principale</span>
+              <span className="text-[10px] text-foreground/45 uppercase block">Complexe RC</span>
               <strong className="text-primary text-sm">
-                {activeSession.tracks?.name || 'Général'}
+                {activeSession.tracks?.name || 'Site Seraing BC'}
               </strong>
             </div>
 
             <div>
-              <span className="text-[10px] text-foreground/45 uppercase block">Temps en piste</span>
+              <span className="text-[10px] text-foreground/45 uppercase block">Temps sur site</span>
               <strong className="text-green-400 text-sm flex items-center gap-1">
                 <Timer className="w-3.5 h-3.5" />
                 {formatElapsedTime(elapsedMinutes)}
@@ -247,30 +247,10 @@ export default function PilotAttendanceWidget({
         </div>
       ) : (
         /* ÉTAT 2 : MEMBRE NON POINTÉ (PRÊT À ROULER) */
-        <div className="space-y-4 font-mono text-xs">
-          {/* Sélection de la Piste */}
-          <div className="space-y-1.5">
-            <label className="text-foreground/70 block uppercase text-[10px]">
-              Piste que vous allez utiliser aujourd'hui :
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {tracks.map((track) => (
-                <button
-                  key={track.id}
-                  type="button"
-                  onClick={() => setSelectedTrackId(track.id)}
-                  className={`p-2 rounded-lg border text-center transition-all cursor-pointer ${
-                    selectedTrackId === track.id
-                      ? 'bg-primary/20 border-primary text-primary font-bold shadow-sm'
-                      : 'bg-surface-dim border-[#353535] text-foreground/60 hover:text-white'
-                  }`}
-                >
-                  <span className="block truncate">{track.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
+        <div className="space-y-3 font-mono text-xs">
+          <p className="text-[11px] text-foreground/50">
+            Enregistrez votre présence sur le complexe pour activer la couverture assurance FBA.
+          </p>
           {/* Gros Bouton d'action tactile */}
           <button
             type="button"
@@ -280,7 +260,7 @@ export default function PilotAttendanceWidget({
           >
             <Play className="w-4 h-4 fill-current" />
             <span className="transform skew-x-8">
-              {actionLoading ? 'Pointage en cours...' : '🚦 Je suis sur la piste (Pointage FBA)'}
+              {actionLoading ? 'Pointage en cours...' : '🚦 Enregistrer ma présence (FBA)'}
             </span>
           </button>
         </div>

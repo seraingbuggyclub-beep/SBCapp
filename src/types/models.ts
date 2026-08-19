@@ -267,10 +267,12 @@ export interface TrackItem {
   type?: string | null;
   status?: TrackStatus;
   is_open: boolean;
+  status_message?: string | null;
   description?: string | null;
   closure_reason?: string | null;
   closure_type?: TrackClosureType | null;
   reopening_at?: string | null;
+  order_index?: number;
   created_at?: string | null;
   updated_at?: string | null;
 }

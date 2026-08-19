@@ -31,7 +31,11 @@ export interface FbaBatchSyncResult {
 }
 
 /**
- * Normalise une chaîne de caractères (supprime les accents, met en minuscule, nettoie les espaces)
+ * Normalise une chaîne de caractères :
+ * - Normalisation Unicode NFD + suppression des diacritiques (accents)
+ * - Conversion en minuscules
+ * - Remplacement des caractères spéciaux par des espaces
+ * - Nettoyage des espaces multiples
  */
 function normalizeString(str: string): string {
   if (!str) return '';
@@ -39,8 +43,104 @@ function normalizeString(str: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
     .trim()
     .replace(/\s+/g, ' ');
+}
+
+/**
+ * Détermine si une affiliation FBA correspond au club 143 (Seraing Buggy Club)
+ */
+function isSbcClub(member: FbaScrapedMember): boolean {
+  const normClub = normalizeString(member.club);
+  const licenseNum = (member.licenseNumber || '').trim();
+  return (
+    licenseNum.startsWith('143-') ||
+    licenseNum.startsWith('143') ||
+    normClub.includes('143') ||
+    normClub.includes('seraing') ||
+    normClub.includes('sbc')
+  );
+}
+
+/**
+ * Recherche et associe un membre au registre FBA :
+ * 1. Normalisation NFD (minuscules + sans accents/caractères spéciaux)
+ * 2. Priorité absolue au club 143 / Seraing Buggy Club (ou matricule débutant par 143-)
+ * 3. Tolérance & Fuzzy matching (noms/prénoms composés ou inversés)
+ */
+function matchFbaMember(
+  allMembers: FbaScrapedMember[],
+  firstName: string,
+  lastName: string
+): FbaScrapedMember | null {
+  const normFirst = normalizeString(firstName);
+  const normLast = normalizeString(lastName);
+
+  if (!normFirst || !normLast) {
+    return null;
+  }
+
+  const targetCombined1 = `${normFirst} ${normLast}`;
+  const targetCombined2 = `${normLast} ${normFirst}`;
+
+  // 1. Recherche exacte : prénom + nom (ou nom + prénom)
+  const exactMatches = allMembers.filter((m) => {
+    const fFirst = normalizeString(m.firstName);
+    const fLast = normalizeString(m.lastName);
+    const fCombined1 = `${fFirst} ${fLast}`;
+    const fCombined2 = `${fLast} ${fFirst}`;
+
+    return (
+      (fFirst === normFirst && fLast === normLast) ||
+      (fFirst === normLast && fLast === normFirst) ||
+      fCombined1 === targetCombined1 ||
+      fCombined2 === targetCombined1 ||
+      fCombined1 === targetCombined2 ||
+      fCombined2 === targetCombined2
+    );
+  });
+
+  if (exactMatches.length > 0) {
+    // Priorité stricte au Club 143 / Seraing Buggy Club
+    const sbcMatch = exactMatches.find(isSbcClub);
+    if (sbcMatch) return sbcMatch;
+    return exactMatches[0];
+  }
+
+  // 2. Recherche tolérante / Fuzzy matching (noms/prénoms composés, tokens multiples)
+  const targetTokens = [...normFirst.split(' '), ...normLast.split(' ')].filter(Boolean);
+
+  const fuzzyMatches = allMembers.filter((m) => {
+    const fFirst = normalizeString(m.firstName);
+    const fLast = normalizeString(m.lastName);
+    const fbaFull = `${fFirst} ${fLast}`;
+    const fbaFullRev = `${fLast} ${fFirst}`;
+
+    // Tous les tokens cibles sont présents dans le nom FBA
+    const allTokensMatch = targetTokens.length > 0 && targetTokens.every((t) => fbaFull.includes(t));
+    if (allTokensMatch) return true;
+
+    // Inclusion partielle / réciproque
+    const isContained = (
+      (fFirst.includes(normFirst) || normFirst.includes(fFirst)) &&
+      (fLast.includes(normLast) || normLast.includes(fLast))
+    ) || (
+      (fFirst.includes(normLast) || normLast.includes(fFirst)) &&
+      (fLast.includes(normFirst) || normFirst.includes(fLast))
+    );
+
+    return isContained || fbaFull.includes(targetCombined1) || fbaFullRev.includes(targetCombined1);
+  });
+
+  if (fuzzyMatches.length > 0) {
+    // Priorité stricte au Club 143 / Seraing Buggy Club
+    const sbcFuzzy = fuzzyMatches.find(isSbcClub);
+    if (sbcFuzzy) return sbcFuzzy;
+    return fuzzyMatches[0];
+  }
+
+  return null;
 }
 
 /**
@@ -151,45 +251,11 @@ export async function fetchFbaMemberLicense(
   firstName: string,
   lastName: string
 ): Promise<FbaScrapedMember | null> {
-  const normFirst = normalizeString(firstName);
-  const normLast = normalizeString(lastName);
-
-  if (!normFirst || !normLast) {
-    return null;
-  }
-
   const allMembers = await fetchAllFbaMembers();
   if (!allMembers.length) {
     return null;
   }
-
-  // Filtrer les candidats correspondants
-  const candidates = allMembers.filter((m) => {
-    const fbaFirst = normalizeString(m.firstName);
-    const fbaLast = normalizeString(m.lastName);
-
-    // Correspondance standard (Prénom + Nom) ou inversée (Nom + Prénom)
-    const exactMatch = (fbaFirst === normFirst && fbaLast === normLast) ||
-                       (fbaFirst === normLast && fbaLast === normFirst);
-
-    if (exactMatch) return true;
-
-    // Correspondance flexible si prénom ou nom composé inclus
-    const fuzzyMatch = (
-      (fbaFirst.includes(normFirst) || normFirst.includes(fbaFirst)) &&
-      (fbaLast.includes(normLast) || normLast.includes(fbaLast))
-    );
-
-    return fuzzyMatch;
-  });
-
-  if (candidates.length === 0) {
-    return null;
-  }
-
-  // Prioriser les affiliations Seraing Buggy Club (SBC)
-  const sbcMatch = candidates.find((c) => /seraing|sbc/i.test(c.club));
-  return sbcMatch || candidates[0];
+  return matchFbaMember(allMembers, firstName, lastName);
 }
 
 /**
@@ -341,15 +407,7 @@ export async function syncAllMembersFbaLicenses(): Promise<FbaBatchSyncResult> {
         continue;
       }
 
-      const normFirst = normalizeString(member.first_name);
-      const normLast = normalizeString(member.last_name);
-
-      const matched = fbaMembers.find((m) => {
-        const fbaFirst = normalizeString(m.firstName);
-        const fbaLast = normalizeString(m.lastName);
-        return (fbaFirst === normFirst && fbaLast === normLast) ||
-               (fbaFirst === normLast && fbaLast === normFirst);
-      });
+      const matched = matchFbaMember(fbaMembers, member.first_name, member.last_name);
 
       if (matched && matched.licenseNumber) {
         await supabase

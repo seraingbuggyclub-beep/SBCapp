@@ -146,10 +146,10 @@ export default function PermissionsTab({
         updated_at: new Date().toISOString(),
         permissions: {},
         referent_permissions: {
-          allowed_track_ids: ['track-1-10', '1/10', 'astro-1-10'],
+          allowed_track_ids: ['11111111-1111-4111-8111-111111111111', 'track-1-10', '1/10', 'astro-1-10'],
           can_open_close_tracks: true,
           can_manage_track_events: true,
-          allowed_event_track_ids: ['track-1-10', '1/10', 'astro-1-10'],
+          allowed_event_track_ids: ['11111111-1111-4111-8111-111111111111', 'track-1-10', '1/10', 'astro-1-10'],
           can_view_members_registry: true,
           can_view_attendance: true,
           can_validate_attendance: true,

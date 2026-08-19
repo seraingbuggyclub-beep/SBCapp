@@ -100,7 +100,7 @@ export default function AttendanceFbaPrintModal({
                   <th className="p-2 border-r border-zinc-300">Pilote (Nom & Prénom)</th>
                   <th className="p-2 border-r border-zinc-300">Licence FBA</th>
                   <th className="p-2 border-r border-zinc-300">Statut</th>
-                  <th className="p-2">Piste</th>
+                  <th className="p-2">Complexe / Site</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200">
@@ -131,7 +131,7 @@ export default function AttendanceFbaPrintModal({
                       <td className="p-2 border-r border-zinc-300 font-bold">{name}</td>
                       <td className="p-2 border-r border-zinc-300 font-mono">{license}</td>
                       <td className="p-2 border-r border-zinc-300">{isMember ? 'Membre SBC' : 'Visiteur 1j'}</td>
-                      <td className="p-2">{item.tracks?.name || 'Général'}</td>
+                      <td className="p-2">{item.tracks?.name || 'Complexe SBC'}</td>
                     </tr>
                   );
                 })}

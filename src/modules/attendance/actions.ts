@@ -375,13 +375,13 @@ export async function generateFbaRegisterExport(
 
     const headers = [
       'Date',
+      'Pilote',
+      'Licence FBA',
+      'Complexe / Site',
       "Heure d'arrivée",
       'Heure de départ',
       'Durée (min)',
-      'Nom & Prénom',
       'Statut Pilote',
-      'N° Licence FBA',
-      'Piste',
       'Mode de pointage',
     ];
 
@@ -391,7 +391,7 @@ export async function generateFbaRegisterExport(
         ? `${item.sbc_members?.last_name || ''} ${item.sbc_members?.first_name || ''}`.trim()
         : item.visitor_name || 'Pilote Visiteur';
       const license = isMember
-        ? item.sbc_members?.license_number || 'En ordre club'
+        ? item.sbc_members?.license_number || 'Affilié Club'
         : item.visitor_license || 'Licence externe';
       const checkInTime = new Date(item.check_in_at).toLocaleTimeString('fr-FR', {
         hour: '2-digit',
@@ -402,17 +402,17 @@ export async function generateFbaRegisterExport(
             hour: '2-digit',
             minute: '2-digit',
           })
-        : 'En cours';
+        : 'Sur site';
 
       return [
         `"${item.check_in_at.split('T')[0]}"`,
+        `"${name}"`,
+        `"${license}"`,
+        `"${item.tracks?.name || 'Complexe SBC'}"`,
         `"${checkInTime}"`,
         `"${checkOutTime}"`,
         `"${item.duration_minutes || '-'}"`,
-        `"${name}"`,
-        `"${isMember ? 'Membre SBC' : 'Visiteur d\'un jour'}"`,
-        `"${license}"`,
-        `"${item.tracks?.name || 'Général'}"`,
+        `"${isMember ? 'Membre SBC' : 'Visiteur 1j'}"`,
         `"${item.source}"`,
       ];
     });

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { X } from 'lucide-react';
+import { CLUB_CONFIG } from '@/config/club';
 
 interface OfficialDocumentsModalProps {
   activeDoc: 'roi' | 'charte' | null;
@@ -28,7 +29,7 @@ export default function OfficialDocumentsModal({ activeDoc, onClose }: OfficialD
               <h3 className="font-anybody font-black text-xl uppercase tracking-tight sport-skew text-white">
                 Règlement d&apos;Ordre Intérieur (ROI)
               </h3>
-              <p className="text-[10px] text-primary mt-0.5">Seraing Buggy Club ASBL • Affilié FBA</p>
+              <p className="text-[10px] text-primary mt-0.5">{CLUB_CONFIG.name} • Affilié {CLUB_CONFIG.affiliation.shortName}</p>
             </div>
 
             <div className="space-y-3 leading-relaxed text-[11px]">
@@ -45,7 +46,7 @@ export default function OfficialDocumentsModal({ activeDoc, onClose }: OfficialD
               <h3 className="font-anybody font-black text-xl uppercase tracking-tight sport-skew text-white">
                 Charte Sportive & Convivialité
               </h3>
-              <p className="text-[10px] text-primary mt-0.5">Seraing Buggy Club ASBL</p>
+              <p className="text-[10px] text-primary mt-0.5">{CLUB_CONFIG.name}</p>
             </div>
 
             <div className="space-y-3 leading-relaxed text-[11px]">

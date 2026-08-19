@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { FbaAttendanceItem } from '@/types/models';
+import { CLUB_CONFIG } from '@/config/club';
 import { X, Printer, ShieldCheck } from 'lucide-react';
 
 interface AttendanceFbaPrintModalProps {
@@ -64,13 +65,13 @@ export default function AttendanceFbaPrintModal({
           <div className="border-b-2 border-black pb-4 flex justify-between items-start">
             <div>
               <h1 className="text-2xl font-black uppercase tracking-tight text-black">
-                Seraing Buggy Club ASBL
+                {CLUB_CONFIG.name}
               </h1>
               <p className="text-zinc-600 text-xs">
-                Registre Officiel d'Émargement & Couverture d'Assurance FBA
+                Registre Officiel d'Émargement & Couverture d'Assurance {CLUB_CONFIG.affiliation.shortName}
               </p>
-              <p className="text-zinc-600 text-xs">
-                Complexe RC de Seraing • Fédération Belge d'Automodélisme
+              <p className="text-zinc-600 text-xs font-mono">
+                BCE : <strong>{CLUB_CONFIG.bce}</strong> • {CLUB_CONFIG.affiliation.name}
               </p>
             </div>
 

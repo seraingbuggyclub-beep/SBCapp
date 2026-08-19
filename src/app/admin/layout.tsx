@@ -3,37 +3,41 @@
 import React, { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/modules/admin/hooks/usePermissions';
 import { useSimulation } from '@/modules/admin/contexts/SimulationContext';
 import { ShieldAlert, AlertTriangle } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { user, profile, isAdmin, loading: authLoading } = useAuth();
   const { simulatedProfile, isSimulationActive } = useSimulation();
+  const permissions = usePermissions(user, profile);
 
   const isSimulatedNonAdmin = Boolean(
-    isSimulationActive && simulatedProfile && simulatedProfile.role !== 'admin'
+    isSimulationActive && simulatedProfile && simulatedProfile.role !== 'admin' && simulatedProfile.role !== 'referent'
   );
 
-  // Redirection automatique vers /dashboard si un non-admin réel tente d'accéder à /admin sans simulation
+  const canAccessAdminArea = permissions.isAdmin || permissions.hasAnyAdminAccess || isSimulationActive;
+
+  // Redirection automatique vers /dashboard si un utilisateur sans droits tente d'accéder à /admin
   useEffect(() => {
-    if (!authLoading && !isAdmin && !isSimulationActive) {
+    if (!authLoading && !canAccessAdminArea) {
       router.replace('/dashboard');
     }
-  }, [authLoading, isAdmin, isSimulationActive, router]);
+  }, [authLoading, canAccessAdminArea, router]);
 
   if (authLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3 font-mono text-xs text-foreground/50">
         <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-        <span>Vérification des droits d'accès administrateur...</span>
+        <span>Vérification des droits d'accès administrateur / référent...</span>
       </div>
     );
   }
 
-  // Si non-admin en conditions réelles, bloquer l'affichage pendant la redirection
-  if (!isAdmin && !isSimulationActive) {
+  // Si utilisateur non autorisé en conditions réelles, bloquer l'affichage pendant la redirection
+  if (!canAccessAdminArea) {
     return null;
   }
 

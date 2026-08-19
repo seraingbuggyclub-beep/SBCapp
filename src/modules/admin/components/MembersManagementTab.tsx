@@ -275,7 +275,7 @@ export default function MembersManagementTab({
             </button>
           )}
 
-          {onNavigateToBlacklist && (
+          {onNavigateToBlacklist && canEditMembers && (
             <button
               onClick={onNavigateToBlacklist}
               className="px-3 py-1.5 rounded bg-secondary/15 hover:bg-secondary/25 border border-secondary/40 text-secondary font-anybody font-bold uppercase text-[11px] tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer"
@@ -496,14 +496,16 @@ export default function MembersManagementTab({
                           <span className="hidden md:inline">Voir</span>
                         </button>
 
-                        <button
-                          onClick={() => handleOpenBlacklistModal(member)}
-                          className="p-1.5 rounded bg-surface hover:bg-secondary/20 border border-[#353535] hover:border-secondary/40 text-foreground/50 hover:text-secondary cursor-pointer transition-colors inline-flex items-center gap-1 text-[10px]"
-                          title="Révoquer & Ajouter à la liste noire"
-                        >
-                          <Ban className="w-3.5 h-3.5 text-secondary" />
-                          <span className="hidden xl:inline">Bloquer</span>
-                        </button>
+                        {canEditMembers && (
+                          <button
+                            onClick={() => handleOpenBlacklistModal(member)}
+                            className="p-1.5 rounded bg-surface hover:bg-secondary/20 border border-[#353535] hover:border-secondary/40 text-foreground/50 hover:text-secondary cursor-pointer transition-colors inline-flex items-center gap-1 text-[10px]"
+                            title="Révoquer & Ajouter à la liste noire"
+                          >
+                            <Ban className="w-3.5 h-3.5 text-secondary" />
+                            <span className="hidden xl:inline">Bloquer</span>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -677,19 +679,21 @@ export default function MembersManagementTab({
               />
             </div>
 
-            {/* Actions disciplinaires */}
-            <div className="pt-2 border-t border-[#353535]/50">
-              <button
-                type="button"
-                onClick={() => {
-                  handleOpenBlacklistModal(selectedMember);
-                }}
-                className="w-full py-2.5 rounded bg-secondary/15 hover:bg-secondary/25 border border-secondary/40 text-secondary text-xs font-mono font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors"
-              >
-                <Ban className="w-4 h-4" />
-                <span>Révoquer & Ajouter à la liste noire</span>
-              </button>
-            </div>
+            {/* Actions disciplinaires (Admin uniquement) */}
+            {canEditMembers && (
+              <div className="pt-2 border-t border-[#353535]/50">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleOpenBlacklistModal(selectedMember);
+                  }}
+                  className="w-full py-2.5 rounded bg-secondary/15 hover:bg-secondary/25 border border-secondary/40 text-secondary text-xs font-mono font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                >
+                  <Ban className="w-4 h-4" />
+                  <span>Révoquer & Ajouter à la liste noire</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

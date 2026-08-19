@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Users, Trophy, Shield, Coffee, Scale, ShieldCheck, Lock } from 'lucide-react';
+import { Users, Trophy, Shield, Coffee, Scale, ShieldCheck, Lock, Landmark } from 'lucide-react';
 import { usePermissions } from '@/modules/admin/hooks/usePermissions';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -15,17 +15,22 @@ export default function AdminNav() {
   const allNavItems = [
     {
       href: '/admin',
-      label: 'Membres & Cadenas',
+      label: permissions.isAdmin ? 'Membres & Cadenas' : 'Membres & Club',
       icon: Users,
       active: pathname === '/admin',
-      visible: permissions.isAdmin || permissions.isReferent,
+      visible: permissions.isAdmin || permissions.hasAnyAdminAccess,
     },
     {
       href: '/admin/presences',
       label: 'Présences FBA',
       icon: ShieldCheck,
       active: pathname.startsWith('/admin/presences'),
-      visible: permissions.isAdmin || Boolean(permissions.referentPermissions?.can_view_attendance),
+      visible:
+        permissions.isAdmin ||
+        Boolean(
+          permissions.referentPermissions?.can_view_attendance ||
+            permissions.referentPermissions?.can_validate_attendance
+        ),
     },
     {
       href: '/admin/comptabilite',
@@ -35,11 +40,18 @@ export default function AdminNav() {
       visible: permissions.isAdmin, // Strictement admin
     },
     {
+      href: '/admin/asbl',
+      label: 'Vie ASBL & AG',
+      icon: Landmark,
+      active: pathname.startsWith('/admin/asbl'),
+      visible: permissions.isAdmin, // Strictement admin
+    },
+    {
       href: '/admin/buvette',
-      label: 'Buvette & POS',
+      label: 'Buvette & Stocks',
       icon: Coffee,
       active: pathname.startsWith('/admin/buvette'),
-      visible: permissions.isAdmin || Boolean(permissions.referentPermissions?.can_manage_bar),
+      visible: permissions.isAdmin, // Administration buvette (prix, stocks, caisse) strictement admin
     },
     {
       href: '/admin/rgpd',
@@ -60,14 +72,14 @@ export default function AdminNav() {
   const navItems = allNavItems.filter((item) => item.visible);
 
   return (
-    <div className="flex items-center gap-2 border-b border-[#353535] pb-2 mb-6 overflow-x-auto scrollbar-none">
+    <div className="flex flex-wrap items-center gap-2 border-b border-[#353535] pb-2.5 mb-2.5">
       {navItems.map((item) => {
         const Icon = item.icon;
         return (
           <Link
             key={item.href}
             href={item.href}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded font-anybody font-extrabold uppercase text-xs tracking-wider transition-all sport-skew cursor-pointer shrink-0 ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded font-anybody font-extrabold uppercase text-xs tracking-wider transition-all sport-skew cursor-pointer ${
               item.active
                 ? 'bg-primary text-black shadow-[3px_3px_0px_#000]'
                 : 'bg-surface text-foreground/70 hover:text-white hover:bg-surface-high border border-[#353535]'

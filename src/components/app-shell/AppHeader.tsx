@@ -21,7 +21,22 @@ export default function AppHeader() {
   const isClubAdmin = Boolean(isAdmin || isSuper || effectiveProfile?.role === 'admin');
   const canManageBar = Boolean(
     isClubAdmin ||
-    (effectiveProfile?.role === 'referent' && effectiveProfile?.referent_permissions?.can_manage_bar)
+    (effectiveProfile?.role === 'referent' && (
+      effectiveProfile?.referent_permissions?.can_pos_bar ||
+      effectiveProfile?.referent_permissions?.can_manage_bar
+    ))
+  );
+
+  const showAdminLink = Boolean(
+    isClubAdmin ||
+    (effectiveProfile?.role === 'referent' && (
+      effectiveProfile?.referent_permissions?.can_view_members_registry ||
+      effectiveProfile?.referent_permissions?.can_view_attendance ||
+      effectiveProfile?.referent_permissions?.can_validate_attendance ||
+      effectiveProfile?.referent_permissions?.can_open_close_tracks ||
+      effectiveProfile?.referent_permissions?.can_manage_track_events ||
+      effectiveProfile?.referent_permissions?.can_manage_pit_lane
+    ))
   );
 
   const [isOpen, setIsOpen] = useState(false);
@@ -92,7 +107,7 @@ export default function AppHeader() {
               </Link>
             );
           })}
-          {isAdmin && (
+          {showAdminLink && (
             <Link
               href="/admin"
               className={`font-anybody text-xs font-bold uppercase tracking-wider transition-colors sport-skew flex items-center gap-1.5 ${
@@ -199,7 +214,7 @@ export default function AppHeader() {
               );
             })}
 
-            {isAdmin && (
+            {showAdminLink && (
               <Link
                 href="/admin"
                 className={`py-2 border-b border-[#353535]/50 flex items-center justify-between ${

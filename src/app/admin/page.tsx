@@ -77,13 +77,32 @@ export default function AdminPage() {
     setLoading(false);
   }, []);
 
-  // Déverrouillage automatique si session admin reconnue
+  // Déverrouillage automatique si session admin ou référent habilité
   useEffect(() => {
-    if (currentUser && (currentUser.email === 'stefga1@gmail.com' || userProfile?.role === 'admin')) {
+    if (currentUser && (permissions.isAdmin || permissions.hasAnyAdminAccess)) {
       setIsAdmin(true);
       fetchAdminData();
     }
-  }, [currentUser, userProfile, fetchAdminData]);
+  }, [currentUser, permissions.isAdmin, permissions.hasAnyAdminAccess, fetchAdminData]);
+
+  // Si l'onglet actif n'est pas autorisé pour ce rôle, basculer vers le premier onglet disponible
+  useEffect(() => {
+    const isTabAllowed = (tab: AdminTab): boolean => {
+      if (permissions.isAdmin) return true;
+      if (tab === 'members') return Boolean(permissions.referentPermissions?.can_view_members_registry);
+      if (tab === 'tracks') return Boolean(permissions.referentPermissions?.can_open_close_tracks);
+      if (tab === 'communications') return Boolean(permissions.referentPermissions?.can_manage_pit_lane);
+      if (tab === 'feedback') return true;
+      return false; // blacklist, treasury, permissions, cadenas -> admin only
+    };
+
+    if (!isTabAllowed(activeTab)) {
+      if (permissions.referentPermissions?.can_view_members_registry) setActiveTab('members');
+      else if (permissions.referentPermissions?.can_open_close_tracks) setActiveTab('tracks');
+      else if (permissions.referentPermissions?.can_manage_pit_lane) setActiveTab('communications');
+      else setActiveTab('feedback');
+    }
+  }, [permissions.isAdmin, permissions.referentPermissions, activeTab]);
 
   const handleAdminAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -245,10 +264,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 py-4">
-      {/* Navigation Modules Admin */}
-      <AdminNav />
-
+    <div className="max-w-6xl mx-auto space-y-6 py-4">
       {/* Header Admin */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#353535] pb-4">
         <div>
@@ -264,80 +280,87 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Bannière de notification globale */}
-      {updateMsg && (
-        <div className="p-3 rounded bg-primary/10 border border-primary/30 text-primary text-xs font-mono animate-fade-in flex items-center justify-between">
-          <span>{updateMsg}</span>
-          <button onClick={() => setUpdateMsg('')} className="text-foreground/40 hover:text-white cursor-pointer">×</button>
-        </div>
-      )}
+      {/* Bloc de Navigation Unifié (Menu Principal + Sous-Onglets) */}
+      <div className="space-y-2">
+        {/* Navigation Modules Admin Principale */}
+        <AdminNav />
 
-      {/* Navigation par Onglets (Affichage multi-lignes sans scroll horizontal) */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-[#353535] pb-3">
-        <button
-          onClick={() => setActiveTab('members')}
-          className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
-            activeTab === 'members'
-              ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
-              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
-          }`}
-        >
-          <Users className="w-3.5 h-3.5" />
-          <span className="transform skew-x-8">Pilotes ({members.length})</span>
-        </button>
+        {/* Sous-navigation par Onglets Internes */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-[#353535] pb-3">
+        {(permissions.isAdmin || permissions.referentPermissions?.can_view_members_registry) && (
+          <button
+            onClick={() => setActiveTab('members')}
+            className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'members'
+                ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
+                : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span className="transform skew-x-8">Pilotes ({members.length})</span>
+          </button>
+        )}
 
-        <button
-          onClick={() => setActiveTab('blacklist')}
-          className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
-            activeTab === 'blacklist'
-              ? 'bg-secondary text-white shadow-[2px_2px_0px_#000]'
-              : 'bg-surface border border-secondary/40 text-secondary hover:bg-secondary/20'
-          }`}
-        >
-          <ShieldAlert className="w-3.5 h-3.5 text-secondary" />
-          <span className="transform skew-x-8 flex items-center gap-1">
-            Liste Noire
-            <span className="px-1 py-0.2 rounded bg-secondary/30 text-[8px] font-mono uppercase font-bold text-white">
-              Privé
+        {permissions.isAdmin && (
+          <button
+            onClick={() => setActiveTab('blacklist')}
+            className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'blacklist'
+                ? 'bg-secondary text-white shadow-[2px_2px_0px_#000]'
+                : 'bg-surface border border-secondary/40 text-secondary hover:bg-secondary/20'
+            }`}
+          >
+            <ShieldAlert className="w-3.5 h-3.5 text-secondary" />
+            <span className="transform skew-x-8 flex items-center gap-1">
+              Liste Noire
+              <span className="px-1 py-0.2 rounded bg-secondary/30 text-[8px] font-mono uppercase font-bold text-white">
+                Admin
+              </span>
             </span>
-          </span>
-        </button>
+          </button>
+        )}
 
-        <button
-          onClick={() => setActiveTab('treasury')}
-          className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
-            activeTab === 'treasury'
-              ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
-              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
-          }`}
-        >
-          <Coins className="w-3.5 h-3.5" />
-          <span className="transform skew-x-8">Trésorerie & Cotisations</span>
-        </button>
+        {permissions.isAdmin && (
+          <button
+            onClick={() => setActiveTab('treasury')}
+            className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'treasury'
+                ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
+                : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
+            }`}
+          >
+            <Coins className="w-3.5 h-3.5" />
+            <span className="transform skew-x-8">Trésorerie & Cotisations</span>
+          </button>
+        )}
 
-        <button
-          onClick={() => setActiveTab('tracks')}
-          className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
-            activeTab === 'tracks'
-              ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
-              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
-          }`}
-        >
-          <Flag className="w-3.5 h-3.5" />
-          <span className="transform skew-x-8">Pistes</span>
-        </button>
+        {(permissions.isAdmin || permissions.referentPermissions?.can_open_close_tracks) && (
+          <button
+            onClick={() => setActiveTab('tracks')}
+            className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'tracks'
+                ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
+                : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
+            }`}
+          >
+            <Flag className="w-3.5 h-3.5" />
+            <span className="transform skew-x-8">Pistes</span>
+          </button>
+        )}
 
-        <button
-          onClick={() => setActiveTab('communications')}
-          className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
-            activeTab === 'communications'
-              ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
-              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
-          }`}
-        >
-          <Radio className="w-3.5 h-3.5" />
-          <span className="transform skew-x-8">Brief Pit-Lane</span>
-        </button>
+        {(permissions.isAdmin || permissions.referentPermissions?.can_manage_pit_lane) && (
+          <button
+            onClick={() => setActiveTab('communications')}
+            className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'communications'
+                ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
+                : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
+            }`}
+          >
+            <Radio className="w-3.5 h-3.5" />
+            <span className="transform skew-x-8">Brief Pit-Lane</span>
+          </button>
+        )}
 
         <button
           onClick={() => setActiveTab('feedback')}
@@ -351,29 +374,33 @@ export default function AdminPage() {
           <span className="transform skew-x-8">Idées & Signalements</span>
         </button>
 
-        <button
-          onClick={() => setActiveTab('permissions')}
-          className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
-            activeTab === 'permissions'
-              ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
-              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
-          }`}
-        >
-          <Ghost className="w-3.5 h-3.5" />
-          <span className="transform skew-x-8">Permissions & Simulateur</span>
-        </button>
+        {permissions.isAdmin && (
+          <button
+            onClick={() => setActiveTab('permissions')}
+            className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'permissions'
+                ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
+                : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
+            }`}
+          >
+            <Ghost className="w-3.5 h-3.5" />
+            <span className="transform skew-x-8">Permissions & Simulateur</span>
+          </button>
+        )}
 
-        <button
-          onClick={() => setActiveTab('cadenas')}
-          className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
-            activeTab === 'cadenas'
-              ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
-              : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
-          }`}
-        >
-          <Key className="w-3.5 h-3.5" />
-          <span className="transform skew-x-8">Code Cadenas</span>
-        </button>
+        {permissions.isAdmin && (
+          <button
+            onClick={() => setActiveTab('cadenas')}
+            className={`h-9 px-3 py-1.5 rounded font-anybody font-bold text-xs uppercase tracking-wider transition-all sport-skew flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'cadenas'
+                ? 'bg-primary text-black shadow-[2px_2px_0px_#000]'
+                : 'bg-surface border border-[#353535] text-foreground/60 hover:text-white hover:bg-surface-high'
+            }`}
+          >
+            <Key className="w-3.5 h-3.5" />
+            <span className="transform skew-x-8">Code Cadenas</span>
+          </button>
+        )}
 
         <button
           onClick={fetchAdminData}
@@ -384,6 +411,15 @@ export default function AdminPage() {
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
+      </div>
+
+      {/* Bannière de notification globale */}
+      {updateMsg && (
+        <div className="p-3 rounded bg-primary/10 border border-primary/30 text-primary text-xs font-mono animate-fade-in flex items-center justify-between">
+          <span>{updateMsg}</span>
+          <button onClick={() => setUpdateMsg('')} className="text-foreground/40 hover:text-white cursor-pointer">×</button>
+        </div>
+      )}
 
       {/* Contenu de l'onglet actif */}
       {activeTab === 'members' && (

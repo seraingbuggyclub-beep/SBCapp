@@ -3,19 +3,29 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, LayoutDashboard, MapPin, ShieldAlert, Award, Calendar, Radio, Shield } from 'lucide-react';
+import { Home, LayoutDashboard, MapPin, ShieldAlert, Award, Calendar, Radio, Shield, Coffee } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/modules/admin/hooks/usePermissions';
 import { useUnreadBrief } from '@/hooks/useUnreadBrief';
 
 export default function AppSidebar() {
   const pathname = usePathname();
-  const { isAdmin } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
+  const permissions = usePermissions(user, profile);
   const { hasUnreadBrief, markAsRead } = useUnreadBrief();
+
+  const showAdminLink = permissions.isAdmin || permissions.hasAnyAdminAccess;
+  const canPosBar = Boolean(
+    permissions.isAdmin ||
+    permissions.referentPermissions?.can_pos_bar ||
+    permissions.referentPermissions?.can_manage_bar
+  );
 
   const links = [
     { href: '/', label: 'Accueil', icon: Home },
     { href: '/events', label: 'Courses & Calendrier', icon: Calendar },
     { href: '/check-in', label: 'Check-in Terrain', icon: MapPin },
+    ...(canPosBar ? [{ href: '/buvette', label: 'Caisse Buvette', icon: Coffee }] : []),
     { href: '/dashboard', label: 'Espace Pilote', icon: LayoutDashboard },
     { href: '/pit-lane', label: 'Pit-Lane', icon: Radio },
   ];
@@ -58,7 +68,7 @@ export default function AppSidebar() {
               );
             })}
 
-            {isAdmin && (
+            {showAdminLink && (
               <Link
                 href="/admin"
                 className={`flex items-center gap-3 px-3 py-2.5 rounded font-medium text-sm transition-all border ${

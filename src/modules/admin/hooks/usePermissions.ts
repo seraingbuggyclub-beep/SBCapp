@@ -68,11 +68,42 @@ export function usePermissions(
       
       // Si référent, vérification des prérogatives modulaires spécifiques
       if (isReferentUser && referentPermissions) {
-        if (moduleId === 'tracks') return Boolean(referentPermissions.can_open_close_tracks);
-        if (moduleId === 'events') return Boolean(referentPermissions.can_manage_track_events);
-        if (moduleId === 'buvette' || moduleId === 'bar') return Boolean(referentPermissions.can_manage_bar);
-        if (moduleId === 'presences' || moduleId === 'attendance') return Boolean(referentPermissions.can_view_attendance);
-        if (moduleId === 'pit_lane' || moduleId === 'news') return Boolean(referentPermissions.can_manage_pit_lane);
+        if (moduleId === 'members') {
+          if (actionId === 'contacts') {
+            return Boolean(referentPermissions.can_view_members_registry && referentPermissions.can_view_member_contact_details);
+          }
+          if (actionId === 'view' || actionId === 'list') {
+            return Boolean(referentPermissions.can_view_members_registry);
+          }
+          return false; // Référents ne peuvent pas éditer, licencier ou blacklister les membres
+        }
+        if (moduleId === 'tracks') {
+          return Boolean(referentPermissions.can_open_close_tracks);
+        }
+        if (moduleId === 'events') {
+          if (actionId === 'create' || actionId === 'edit') {
+            return Boolean(referentPermissions.can_create_edit_events ?? referentPermissions.can_manage_track_events);
+          }
+          if (actionId === 'registrations' || actionId === 'checkin') {
+            return Boolean(referentPermissions.can_manage_event_registrations ?? referentPermissions.can_manage_track_events);
+          }
+          return Boolean(referentPermissions.can_manage_track_events);
+        }
+        if (moduleId === 'buvette' || moduleId === 'bar') {
+          if (actionId === 'pos' || actionId === 'service') {
+            return Boolean(referentPermissions.can_pos_bar || referentPermissions.can_manage_bar);
+          }
+          return false; // Tarifs, caisse globale et stocks réservés aux admins
+        }
+        if (moduleId === 'presences' || moduleId === 'attendance') {
+          if (actionId === 'validate') {
+            return Boolean(referentPermissions.can_validate_attendance);
+          }
+          return Boolean(referentPermissions.can_view_attendance || referentPermissions.can_validate_attendance);
+        }
+        if (moduleId === 'pit_lane' || moduleId === 'news' || moduleId === 'communications') {
+          return Boolean(referentPermissions.can_manage_pit_lane);
+        }
         return false;
       }
 
@@ -80,10 +111,24 @@ export function usePermissions(
     };
   }, [isSuper, activeProfile, isReferentUser, referentPermissions, activeUser?.email]);
 
+  const hasAnyAdminAccess = useMemo(() => {
+    if (isAdminUser) return true;
+    if (!isReferentUser || !referentPermissions) return false;
+    return Boolean(
+      referentPermissions.can_view_members_registry ||
+      referentPermissions.can_view_attendance ||
+      referentPermissions.can_validate_attendance ||
+      referentPermissions.can_open_close_tracks ||
+      referentPermissions.can_manage_track_events ||
+      referentPermissions.can_manage_pit_lane
+    );
+  }, [isAdminUser, isReferentUser, referentPermissions]);
+
   return {
     isSuperAdmin: isSuper,
     isAdmin: isAdminUser,
     isReferent: isReferentUser,
+    hasAnyAdminAccess,
     referentPermissions,
     canManageTrack,
     activeProfile,

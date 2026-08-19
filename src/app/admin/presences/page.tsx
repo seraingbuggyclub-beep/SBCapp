@@ -96,7 +96,14 @@ export default function AdminPresencesPage() {
     loadData();
   }, [loadData]);
 
-  if (!user || (!permissions.isAdmin && !permissions.isSuperAdmin)) {
+  const canAccessAttendance = Boolean(
+    permissions.isAdmin ||
+    permissions.isSuperAdmin ||
+    permissions.referentPermissions?.can_view_attendance ||
+    permissions.referentPermissions?.can_validate_attendance
+  );
+
+  if (!user || !canAccessAttendance) {
     return (
       <div className="max-w-md mx-auto my-12 p-6 bg-surface border border-secondary/30 rounded-2xl text-center space-y-4 font-mono text-xs">
         <ShieldAlert className="w-10 h-10 text-secondary mx-auto" />
@@ -104,7 +111,7 @@ export default function AdminPresencesPage() {
           Accès Restreint
         </h2>
         <p className="text-foreground/60">
-          Le registre légal de présence FBA et les statistiques de fréquentation sont réservés aux administrateurs.
+          Le registre légal de présence FBA et les validations de présence sont réservés aux référents et administrateurs habilités.
         </p>
         <Link
           href="/dashboard"

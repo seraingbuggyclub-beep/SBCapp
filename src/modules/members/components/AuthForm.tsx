@@ -15,6 +15,8 @@ import {
   Calendar, 
   Hash, 
   ShieldAlert,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -25,6 +27,7 @@ export default function AuthForm() {
   // Champs de base (Visiteur & Adhérent)
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [insuranceAck, setInsuranceAck] = useState(false);
@@ -260,13 +263,22 @@ export default function AuthForm() {
             <div className="relative">
               <KeyRound className="absolute left-3 top-2.5 w-4 h-4 text-foreground/35 pointer-events-none" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 autoComplete={isSignUp ? "new-password" : "current-password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-background border border-[#353535] rounded pl-10 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-sans"
+                className="w-full bg-background border border-[#353535] rounded pl-10 pr-10 py-2 text-sm text-white focus:outline-none focus:border-primary font-sans"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-foreground/40 hover:text-white transition-colors cursor-pointer"
+                title={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
         </div>

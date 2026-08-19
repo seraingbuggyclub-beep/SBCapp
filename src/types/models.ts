@@ -24,12 +24,23 @@ export type ModulePermissionAction = 'view' | 'edit' | 'delete' | 'manage';
 export type ModulePermissionsMap = Record<string, string[] | Record<string, boolean>>;
 
 export interface ReferentPermissions {
+  // Membres & Pilotes
+  can_view_members_registry?: boolean;
+  can_view_member_contact_details?: boolean;
+  // Présences FBA
+  can_view_attendance?: boolean;
+  can_validate_attendance?: boolean;
+  // Pistes & Terrains
   allowed_track_ids: string[];
   can_open_close_tracks: boolean;
+  // Courses & Événements
   can_manage_track_events: boolean;
+  can_create_edit_events?: boolean;
+  can_manage_event_registrations?: boolean;
   allowed_event_track_ids: string[];
-  can_manage_bar: boolean;
-  can_view_attendance: boolean;
+  // Outils Terrain & Communication
+  can_pos_bar?: boolean;
+  can_manage_bar?: boolean; // rétrocompatibilité / point de vente
   can_manage_pit_lane: boolean;
 }
 
@@ -752,6 +763,70 @@ export interface WorkSessionReport {
   waterRedeemed: number;
   mealsRedeemed: number;
   estimatedExpense: number;
+}
+
+// ==========================================
+// VIE ASBL & ASSEMBLÉES GÉNÉRALES (AG)
+// ==========================================
+export type GeneralAssemblyType = 'ORDINAIRE' | 'EXTRAORDINAIRE';
+export type GeneralAssemblyStatus = 'DRAFT' | 'VOTING' | 'SIGNING' | 'ARCHIVED';
+
+export interface AgResolutionItem {
+  id: string;
+  ag_id: string;
+  title: string;
+  description?: string | null;
+  votes_for: number;
+  votes_against: number;
+  votes_abstain: number;
+  is_adopted: boolean;
+  created_at?: string;
+}
+
+export interface AgSignatureItem {
+  id: string;
+  ag_id: string;
+  member_id?: string | null;
+  signer_name: string;
+  signer_role: string;
+  signature_data: string; // Base64 SVG / PNG
+  signed_at: string;
+}
+
+export interface GeneralAssemblyItem {
+  id: string;
+  type: GeneralAssemblyType;
+  title: string;
+  date: string;
+  location: string;
+  status: GeneralAssemblyStatus;
+  agenda: string[];
+  content_notes?: string | null;
+  pdf_url?: string | null;
+  created_at: string;
+  updated_at: string;
+  resolutions?: AgResolutionItem[];
+  signatures?: AgSignatureItem[];
+}
+
+export interface SaveGeneralAssemblyInput {
+  id?: string;
+  type: GeneralAssemblyType;
+  title: string;
+  date: string;
+  location: string;
+  status: GeneralAssemblyStatus;
+  agenda: string[];
+  content_notes?: string | null;
+  resolutions?: Array<{
+    id?: string;
+    title: string;
+    description?: string | null;
+    votes_for: number;
+    votes_against: number;
+    votes_abstain: number;
+    is_adopted: boolean;
+  }>;
 }
 
 // ==========================================

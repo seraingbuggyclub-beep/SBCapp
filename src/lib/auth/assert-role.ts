@@ -98,7 +98,19 @@ export async function assertReferentOrAdmin(
     // Validation optionnelle d'une permission granulaire pour les référents
     if (isReferent && !isAdmin && !isSuper && requiredReferentPermissionKey) {
       const referentPerms = profile?.referent_permissions as ReferentPermissions | null;
-      if (!referentPerms || !referentPerms[requiredReferentPermissionKey]) {
+      let hasRequired = false;
+
+      if (referentPerms) {
+        if (requiredReferentPermissionKey === 'can_manage_bar' || requiredReferentPermissionKey === 'can_pos_bar') {
+          hasRequired = Boolean(referentPerms.can_pos_bar || referentPerms.can_manage_bar);
+        } else if (requiredReferentPermissionKey === 'can_view_attendance') {
+          hasRequired = Boolean(referentPerms.can_view_attendance || referentPerms.can_validate_attendance);
+        } else {
+          hasRequired = Boolean(referentPerms[requiredReferentPermissionKey]);
+        }
+      }
+
+      if (!hasRequired) {
         return {
           authorized: false,
           user: authUser,

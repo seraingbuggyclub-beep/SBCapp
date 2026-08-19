@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { AccountingMetrics, AccountingTransaction } from '@/types/models';
+import { CLUB_CONFIG } from '@/config/club';
 import { X, Printer, Scale, Building2, Coins, CheckCircle2 } from 'lucide-react';
 
 interface AccountingAgReportModalProps {
@@ -78,13 +79,13 @@ export default function AccountingAgReportModal({
           <div className="border-b-2 border-black pb-4 flex justify-between items-start">
             <div>
               <h1 className="text-2xl font-black uppercase tracking-tight text-black">
-                Seraing Buggy Club ASBL
+                {CLUB_CONFIG.name}
               </h1>
-              <p className="text-zinc-600 text-xs">
-                Association Sans But Lucratif • Numéro d'entreprise / BCE
+              <p className="text-zinc-600 text-xs font-mono">
+                BCE : <strong>{CLUB_CONFIG.bce}</strong> • {CLUB_CONFIG.rpm}
               </p>
               <p className="text-zinc-600 text-xs">
-                Complexe RC tout-terrain de Seraing • Belgique
+                Siège Social : {CLUB_CONFIG.address.full} • Tél : {CLUB_CONFIG.contact.phone}
               </p>
             </div>
 

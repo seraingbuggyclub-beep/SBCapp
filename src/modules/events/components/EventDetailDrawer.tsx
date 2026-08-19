@@ -10,6 +10,8 @@ import {
   Trophy,
   PartyPopper,
   Info,
+  Wrench,
+  Users,
 } from 'lucide-react';
 import { MergedCalendarItem, EventType } from '@/types/models';
 
@@ -34,6 +36,11 @@ export default function EventDetailDrawer({
 
   const getEventTypeBadge = (type?: EventType) => {
     switch (type) {
+      case 'work_session':
+        return {
+          label: '🛠️ Travaux & Bénévoles',
+          className: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+        };
       case 'sbc_race':
         return {
           label: '🏁 Course Club SBC',
@@ -56,7 +63,7 @@ export default function EventDetailDrawer({
         };
       default:
         return {
-          label: 'Course / Activité',
+          label: 'Activité Club',
           className: 'bg-primary/10 text-primary border-primary/20',
         };
     }
@@ -93,8 +100,11 @@ export default function EventDetailDrawer({
       ) : (
         <div className="space-y-4">
           {items.map((item) => {
+            const isWorkSession = item.source === 'work_session' || item.event_type === 'work_session';
             const isSupabase = item.source === 'supabase_event';
-            const badge = isSupabase
+            const badge = isWorkSession
+              ? getEventTypeBadge('work_session')
+              : isSupabase
               ? getEventTypeBadge(item.event_type)
               : {
                   label: '🇧🇪 Férié / Fête Belge',
@@ -106,7 +116,11 @@ export default function EventDetailDrawer({
             return (
               <div
                 key={item.id}
-                className="p-5 rounded-lg border border-[#353535] bg-surface/50 hover:bg-surface transition-all space-y-3"
+                className={`p-5 rounded-lg border transition-all space-y-3 ${
+                  isWorkSession
+                    ? 'border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10'
+                    : 'border-[#353535] bg-surface/50 hover:bg-surface'
+                }`}
               >
                 {/* Badge type + Titre */}
                 <div className="space-y-1.5">
@@ -118,6 +132,12 @@ export default function EventDetailDrawer({
                       <span className="text-[10px] text-foreground/50 font-mono flex items-center gap-1">
                         <Clock className="w-3 h-3 text-primary" />
                         {item.start_time.slice(0, 5)} {item.end_time ? `- ${item.end_time.slice(0, 5)}` : ''}
+                      </span>
+                    )}
+                    {isWorkSession && item.max_participants !== undefined && (
+                      <span className="text-[10px] text-amber-400/90 font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                        <Users className="w-3 h-3 text-amber-400" />
+                        {item.volunteers_count || 0} / {item.max_participants} bénévole(s)
                       </span>
                     )}
                   </div>
@@ -144,7 +164,22 @@ export default function EventDetailDrawer({
 
                 {/* Actions & Tarification */}
                 <div className="pt-2 border-t border-[#353535]/50 flex items-center justify-between gap-3 flex-wrap">
-                  {isSupabase && item.has_registration ? (
+                  {isWorkSession ? (
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-xs font-mono text-amber-400 font-semibold flex items-center gap-1">
+                        <Wrench className="w-3.5 h-3.5" />
+                        Repas & boissons offerts aux bénévoles
+                      </span>
+
+                      <Link
+                        href="/events?tab=work_sessions"
+                        className="px-4 py-1.5 bg-amber-400 text-black font-anybody font-black uppercase text-xs tracking-wider rounded sport-skew hover:bg-amber-300 transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+                      >
+                        <Wrench className="w-3.5 h-3.5" />
+                        <span className="transform skew-x-8">Participer aux travaux</span>
+                      </Link>
+                    </div>
+                  ) : isSupabase && item.has_registration ? (
                     <div className="flex items-center justify-between w-full">
                       <div className="text-xs font-mono text-primary font-bold">
                         À partir de €{Number(item.registration_fee || 0).toFixed(2)}

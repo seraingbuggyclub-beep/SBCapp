@@ -6,11 +6,12 @@ import {
   ChevronRight,
   Calendar as CalendarIcon,
   Plus,
-  Shield,
+  Wrench,
+  Trophy,
 } from 'lucide-react';
 import { MergedCalendarItem } from '@/types/models';
 
-export type CalendarFilterType = 'all' | 'sbc' | 'champ' | 'holiday';
+export type CalendarFilterType = 'all' | 'sbc' | 'champ' | 'work' | 'holiday';
 
 const MONTH_NAMES = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -168,6 +169,15 @@ export default function CalendarGrid({
               Champ. BE
             </button>
             <button
+              onClick={() => onSelectFilter('work')}
+              className={`px-2 py-1 rounded transition-colors cursor-pointer flex items-center gap-1 ${
+                selectedFilter === 'work' ? 'bg-amber-400 text-black font-bold' : 'text-amber-400/80 hover:text-amber-300'
+              }`}
+            >
+              <Wrench className="w-2.5 h-2.5" />
+              <span>Travaux</span>
+            </button>
+            <button
               onClick={() => onSelectFilter('holiday')}
               className={`px-2 py-1 rounded transition-colors cursor-pointer ${
                 selectedFilter === 'holiday' ? 'bg-primary text-black font-bold' : 'text-foreground/60 hover:text-white'
@@ -219,6 +229,7 @@ export default function CalendarGrid({
             const isToday = cd.dateString === todayString;
             const isSelected = cd.dateString === selectedDate;
             const hasSbcEvent = items.some((it) => it.source === 'supabase_event');
+            const hasWorkSession = items.some((it) => it.source === 'work_session');
             const hasHoliday = items.some((it) => it.source === 'belgian_holiday');
 
             return (
@@ -265,13 +276,15 @@ export default function CalendarGrid({
                     <div
                       key={item.id}
                       className={`text-[8px] md:text-[9px] truncate px-1 py-0.5 rounded font-mono font-bold leading-tight ${
-                        item.source === 'supabase_event'
+                        item.source === 'work_session'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          : item.source === 'supabase_event'
                           ? 'bg-racing-red/20 text-racing-red border border-racing-red/30'
                           : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                       }`}
                       title={item.title}
                     >
-                      {item.title}
+                      {item.source === 'work_session' ? `🛠️ ${item.title}` : item.title}
                     </div>
                   ))}
                   {items.length > 2 && (
@@ -283,6 +296,7 @@ export default function CalendarGrid({
 
                 {/* Indicateurs discrets en bas de cellule */}
                 <div className="flex gap-1 mt-auto pt-1">
+                  {hasWorkSession && <div className="w-1.5 h-1.5 rounded-full bg-amber-400" title="Session Travaux SBC" />}
                   {hasSbcEvent && <div className="w-1.5 h-1.5 rounded-full bg-primary" title="Course Club SBC" />}
                   {hasHoliday && <div className="w-1.5 h-1.5 rounded-full bg-blue-400" title="Jour Férié / Fête" />}
                 </div>

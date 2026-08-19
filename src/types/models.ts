@@ -14,7 +14,7 @@ export type Json =
 export type UserRole = 'visitor' | 'member' | 'daily_member' | 'referent' | 'admin';
 export type PaymentStatus = 'pending' | 'paid' | 'expired' | 'exempt';
 export type CheckInType = 'manual' | 'auto';
-export type EventType = 'sbc_race' | 'belgian_championship' | 'holiday' | 'club_meeting';
+export type EventType = 'sbc_race' | 'belgian_championship' | 'holiday' | 'club_meeting' | 'work_session';
 export type EventStatus = 'open' | 'closed' | 'ongoing' | 'completed' | 'cancelled' | 'draft';
 
 // ==========================================
@@ -240,7 +240,7 @@ export interface MergedCalendarItem {
   date: string; // YYYY-MM-DD
   title: string;
   description?: string | null;
-  source: 'supabase_event' | 'belgian_holiday';
+  source: 'supabase_event' | 'belgian_holiday' | 'work_session';
   event_type?: EventType;
   has_registration?: boolean;
   external_link?: string | null;
@@ -248,6 +248,8 @@ export interface MergedCalendarItem {
   start_time?: string;
   end_time?: string;
   registration_fee?: number;
+  max_participants?: number;
+  volunteers_count?: number;
 }
 
 // ==========================================

@@ -110,6 +110,17 @@ export default function EventsPage() {
   }, []);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      const hash = window.location.hash;
+      if (tabParam === 'work_sessions' || hash === '#work_sessions' || hash === '#travaux') {
+        setActiveMainTab('work_sessions');
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     if (user) {
       loadMemberRegs(user.id);
     } else {
